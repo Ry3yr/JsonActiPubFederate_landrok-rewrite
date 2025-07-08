@@ -1,0 +1,10 @@
+{
+  "subject": "acct:yusaao@yusaao.com",
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/activity+json",
+      "href": "https://yusaao.com/yusaao"
+    }
+  ]
+}
