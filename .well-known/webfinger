@@ -1,5 +1,8 @@
 {
   "subject": "acct:yusaao@yusaao.com",
+  "aliases": [
+    "https://yusaao.com/yusaao"
+  ],
   "links": [
     {
       "rel": "self",
