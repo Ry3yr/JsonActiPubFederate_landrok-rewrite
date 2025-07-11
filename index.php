@@ -1,4 +1,6 @@
 <?php
+file_put_contents(__DIR__ . '/debug.log', "[" . date('c') . "] REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n", FILE_APPEND);
+
 $autoloadPath = __DIR__ . '/vendor/autoload.php';
 if (!file_exists($autoloadPath)) {
     die("Error: Autoload file not found at $autoloadPath\n");
@@ -7,32 +9,50 @@ require $autoloadPath;
 
 use ActivityPhp\Server;
 
-// --- CONFIGURATION ---
-$domain = 'yusaao.com';
-$username = 'yusaao';
+$domain = 'alceawis.com';
+$username = 'alceawis';
 $baseUrl = "https://$domain";
 
-// Instantiate ActivityPub server (optional)
 $server = new Server();
 
-// Load posts from JSON file
 $data = json_decode(file_get_contents(__DIR__ . '/data_alcea.json'), true);
 $pushedFile = __DIR__ . '/pushed.json';
 $pushed = file_exists($pushedFile) ? json_decode(file_get_contents($pushedFile), true) : [];
 
 $outboxItems = [];
 
-// Prepare outbox and detect new posts to push
+// Helper function to format emoji (unchanged)
+function formatEmojis($text) {
+    return $text; // Don't replace emoji shortcodes
+}
+
+function formatDescriptionLinks(string $text): string {
+    $escaped = htmlspecialchars($text);
+    $html = preg_replace(
+        '~(https?://[^\s<]+)~i',
+        '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>',
+        $escaped
+    );
+    return nl2br($html);
+}
+
 foreach ($data as $entry) {
     foreach ($entry as $date => $content) {
         $hash = substr(md5($content['value']), 0, 8);
         $text = formatEmojis($content['value']);
         $hashtags = array_filter(array_map('trim', explode(',', $content['hashtags'] ?? '')));
-
-        if (count($hashtags) > 0) {
-            $text .= ' ' . implode(' ', array_map(fn($t) => "#$t", $hashtags));
-        }
-
+        $escapedText = htmlspecialchars($text);
+        $htmlText = preg_replace(
+            '~(https?://[^\s<]+)~i',
+            '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>',
+            $escapedText
+        );
+        $htmlText = preg_replace_callback('/#([\w-]+)/', function($matches) use ($domain) {
+            $tag = $matches[1];
+            $url = "https://$domain/tags/" . urlencode($tag);
+            return "<a href=\"$url\" rel=\"tag nofollow noopener noreferrer\">#" . htmlspecialchars($tag) . "</a>";
+        }, $htmlText);
+        $htmlText = nl2br($htmlText);
         $tags = array_map(function($tag) use ($domain) {
             return [
                 'type' => 'Hashtag',
@@ -40,6 +60,23 @@ foreach ($data as $entry) {
                 'href' => "https://$domain/tags/$tag"
             ];
         }, $hashtags);
+
+        // Emoji tags
+        preg_match_all('/:([a-zA-Z0-9_]+):/', $content['value'], $emojiMatches);
+        $emojiTags = [];
+        foreach ($emojiMatches[1] as $shortcode) {
+            $emojiTags[] = [
+                'type' => 'Emoji',
+                'name' => ":$shortcode:",
+                'icon' => [
+                    'type' => 'Image',
+                    'mediaType' => 'image/gif',
+                    'url' => "https://$domain/z_files/emojis/$shortcode.gif"
+                ]
+            ];
+        }
+
+        $tags = array_merge($tags, $emojiTags);
 
         $noteId = "$baseUrl/$username/status/{$date}-$hash";
 
@@ -49,13 +86,19 @@ foreach ($data as $entry) {
             'published' => date(DATE_ATOM, strtotime($date)),
             'attributedTo' => "$baseUrl/$username",
             'to' => ['https://www.w3.org/ns/activitystreams#Public'],
-            'content' => nl2br($text),
+
+            // THIS IS THE IMPORTANT PART:
+            'content' => $htmlText,  // content with clickable links
+
+            'contentMap' => [
+                'und' => $text,       // plain text version
+                'html' => $htmlText,  // html version with links
+            ],
             'tag' => $tags,
         ];
 
         $outboxItems[] = $note;
 
-        // Push Create activity if this note wasn't pushed before
         if (!in_array($noteId, $pushed)) {
             sendCreateActivity($note);
             $pushed[] = $noteId;
@@ -71,6 +114,10 @@ $uri = explode('?', $uri)[0];
 if ($uri === "/$username" || $uri === "/$username/") {
     header('Content-Type: application/activity+json');
     header('Vary: Accept');
+
+    $descriptionText = "This is **Alcea's** semit automated profile! It fetches from a local timeline from my website Visit https://alceawis.com for more info.";
+    $descriptionHtml = formatDescriptionLinks($descriptionText);
+
     echo json_encode([
         '@context' => [
             'https://www.w3.org/ns/activitystreams',
@@ -87,6 +134,12 @@ if ($uri === "/$username" || $uri === "/$username/") {
         'type' => 'Person',
         'name' => 'Alcea Bot',
         'preferredUsername' => $username,
+        'summary' => $descriptionHtml,        // Add description with clickable links
+        'icon' => [                         // Add profile picture
+            'type' => 'Image',
+            'mediaType' => 'image/gif',
+            'url' => "$baseUrl/z_files/emojis/alceawis.gif",
+        ],
         'inbox' => "$baseUrl/$username/inbox",
         'outbox' => "$baseUrl/$username/outbox",
         'followers' => "$baseUrl/$username/followers",
@@ -222,14 +275,6 @@ echo "Not found";
 
 // === HELPER FUNCTIONS ===
 
-function formatEmojis($text) {
-    return preg_replace_callback('/:([a-zA-Z0-9_]+):/', function ($matches) {
-        $name = $matches[1];
-        $url = "https://yusaao.com/z_files/emojis/{$name}.gif";
-        return "<img src=\"$url\" alt=\":$name:\" style=\"height:1em;\">";
-    }, $text);
-}
-
 function discoverInbox($actorUrl) {
     if (!str_ends_with($actorUrl, '.json')) {
         $actorUrl = rtrim($actorUrl, '/') . '.json';
@@ -249,7 +294,7 @@ function discoverInbox($actorUrl) {
 }
 
 function sendSignedRequest($inboxUrl, $body) {
-    $keyId = "https://yusaao.com/yusaao#main-key";
+    $keyId = "https://alceawis.com/alceawis#main-key";
     $privateKeyPem = file_get_contents(__DIR__ . '/private.pem');
     $date = gmdate('D, d M Y H:i:s \G\M\T');
     $bodyJson = json_encode($body, JSON_UNESCAPED_SLASHES);
@@ -268,43 +313,43 @@ function sendSignedRequest($inboxUrl, $body) {
         "Host: $host",
         "Date: $date",
         "Digest: $digest",
-        "Content-Type: application/activity+json",
-        "Signature: $signatureHeader"
+        "Signature: $signatureHeader",
+        "Content-Type: application/activity+json"
     ];
 
     $ch = curl_init($inboxUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $bodyJson);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     $response = curl_exec($ch);
+    if (curl_errno($ch)) {
+        file_put_contents(__DIR__ . '/inbox.log', "[" . date('c') . "] cURL error: " . curl_error($ch) . "\n", FILE_APPEND);
+    }
     curl_close($ch);
 
-    file_put_contents(__DIR__ . '/inbox_response.log', "[" . date('c') . "] Sent activity to $inboxUrl\nResponse:\n$response\n\n", FILE_APPEND);
+    return $response;
 }
 
-// --- New function to send Create activity to all followers ---
 function sendCreateActivity(array $note) {
-    global $username, $baseUrl;
-
-    $followersFile = __DIR__ . '/followers.json';
-    $followers = file_exists($followersFile) ? json_decode(file_get_contents($followersFile), true) : [];
+    global $baseUrl, $username;
 
     $activity = [
         '@context' => 'https://www.w3.org/ns/activitystreams',
-        'id' => $note['id'] . '/activity/' . uniqid(),
+        'id' => $note['id'] . '/activity',
         'type' => 'Create',
         'actor' => "$baseUrl/$username",
         'object' => $note,
         'to' => ['https://www.w3.org/ns/activitystreams#Public'],
     ];
 
+    $followersFile = __DIR__ . '/followers.json';
+    $followers = file_exists($followersFile) ? json_decode(file_get_contents($followersFile), true) : [];
+
     foreach ($followers as $follower) {
         $inbox = discoverInbox($follower);
         if ($inbox) {
             sendSignedRequest($inbox, $activity);
-        } else {
-            file_put_contents(__DIR__ . '/inbox.log', "[" . date('c') . "] Could not discover inbox for follower: $follower\n", FILE_APPEND);
         }
     }
 }
