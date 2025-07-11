@@ -1,6 +1,41 @@
 <?php
-file_put_contents(__DIR__ . '/debug.log', "[" . date('c') . "] REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n", FILE_APPEND);
+$currentDomain = $_SERVER['HTTP_HOST'];
+$requestUri = $_SERVER['REQUEST_URI'];
+$rootDomain = 'alceawis.com'; // Replace with your actual root domain
+if ($currentDomain == $rootDomain && $requestUri == '/') {
+    echo '<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>' . PHP_EOL;
+    echo '<script type="text/javascript">$(document).ready(function(){$("#tl").load("https://alceawis.com/fakesocialrender_limited.html");});</script>' . PHP_EOL;
+    echo '<div class="formClass"><div id="tl"></div></div>' . PHP_EOL;}
+?>
+<?php
+// Get the current domain
+$currentDomain = $_SERVER['HTTP_HOST'];
 
+// Check if the domain is the root domain
+$rootDomain = 'example.com'; // Replace with your actual root domain
+
+if ($currentDomain == $rootDomain) {
+    ?>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function(){
+            $("#tl").load("https://alceawis.com/fakesocialrender_limited.html");
+        });
+    </script>
+    <div class="formClass">
+        <div id="tl"></div>
+    </div>
+    <?php
+} else {
+    // Optionally, di
+}
+?>
+
+
+
+
+<?php
+file_put_contents(__DIR__ . '/debug.log', "[" . date('c') . "] REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n", FILE_APPEND);
 $autoloadPath = __DIR__ . '/vendor/autoload.php';
 if (!file_exists($autoloadPath)) {
     die("Error: Autoload file not found at $autoloadPath\n");
@@ -196,6 +231,61 @@ if ($uri === "/$username/outbox" || $uri === "/$username/outbox/") {
     exit;
 }
 
+
+// === GET POST ENDPOINT ===
+if (preg_match('/^\/' . $username . '\/status\/([a-z0-9\-]+)$/', $uri, $matches)) {
+    $postId = $matches[1];
+    $data = json_decode(file_get_contents(__DIR__ . '/data_alcea.json'), true);
+    $post = null;
+    foreach ($data as $entry) {
+        foreach ($entry as $date => $content) {
+            $hash = substr(md5($content['value']), 0, 8);
+            if ("$date-$hash" === $postId) {
+                $post = $content;
+                break 2;
+            }
+        }
+    }
+    if ($post) {
+        $text = formatEmojis($post['value']);
+        $escapedText = htmlspecialchars($text);
+        $htmlText = preg_replace(
+            '~(https?://[^\s<]+)~i',
+            '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>',
+            $escapedText
+        );
+        $noteId = "$baseUrl/$username/status/{$date}-$hash"; // Build the ID
+        $tags = array_map(function($tag) use ($domain) {
+            return [
+                'type' => 'Hashtag',
+                'name' => "#$tag",
+                'href' => "https://$domain/tags/$tag"
+            ];
+        }, explode(',', $post['hashtags'] ?? ''));
+        $note = [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $noteId,
+            'type' => 'Note',
+            'published' => date(DATE_ATOM, strtotime($date)),
+            'attributedTo' => "$baseUrl/$username",
+            'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+            'content' => $htmlText,  // HTML formatted content with clickable links
+            'contentMap' => [
+                'und' => $post['value'],       // plain text version
+                'html' => $htmlText,  // html version with links
+            ],
+            'tag' => $tags,
+        ];
+        header('Content-Type: application/activity+json');
+        echo json_encode($note, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        exit;
+    } else {
+        http_response_code(404);
+        echo "Not found: The post does not exist.";
+        exit;
+    }
+}
+
 // === FOLLOWERS ENDPOINT ===
 if ($uri === "/$username/followers" || $uri === "/$username/followers/") {
     header('Content-Type: application/activity+json');
@@ -279,36 +369,29 @@ function discoverInbox($actorUrl) {
     if (!str_ends_with($actorUrl, '.json')) {
         $actorUrl = rtrim($actorUrl, '/') . '.json';
     }
-
     $opts = ['http' => ['method' => 'GET', 'header' => "Accept: application/activity+json, application/ld+json\r\n"]];
     $context = stream_context_create($opts);
-
     $json = @file_get_contents($actorUrl, false, $context);
     if (!$json) {
         file_put_contents(__DIR__ . '/inbox.log', "[" . date('c') . "] Failed to fetch actor JSON from $actorUrl\n", FILE_APPEND);
         return null;
     }
-
     $actor = json_decode($json, true);
     return $actor['inbox'] ?? null;
 }
-
 function sendSignedRequest($inboxUrl, $body) {
     $keyId = "https://alceawis.com/alceawis#main-key";
     $privateKeyPem = file_get_contents(__DIR__ . '/private.pem');
     $date = gmdate('D, d M Y H:i:s \G\M\T');
     $bodyJson = json_encode($body, JSON_UNESCAPED_SLASHES);
     $digest = 'SHA-256=' . base64_encode(hash('sha256', $bodyJson, true));
-
     $parsed = parse_url($inboxUrl);
     $host = $parsed['host'];
     $path = $parsed['path'];
     $signatureString = "(request-target): post $path\nhost: $host\ndate: $date\ndigest: $digest";
-
     openssl_sign($signatureString, $signature, $privateKeyPem, OPENSSL_ALGO_SHA256);
     $signature_b64 = base64_encode($signature);
     $signatureHeader = 'keyId="' . $keyId . '",algorithm="rsa-sha256",headers="(request-target) host date digest",signature="' . $signature_b64 . '"';
-
     $headers = [
         "Host: $host",
         "Date: $date",
@@ -316,7 +399,6 @@ function sendSignedRequest($inboxUrl, $body) {
         "Signature: $signatureHeader",
         "Content-Type: application/activity+json"
     ];
-
     $ch = curl_init($inboxUrl);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $bodyJson);
@@ -327,13 +409,10 @@ function sendSignedRequest($inboxUrl, $body) {
         file_put_contents(__DIR__ . '/inbox.log', "[" . date('c') . "] cURL error: " . curl_error($ch) . "\n", FILE_APPEND);
     }
     curl_close($ch);
-
     return $response;
 }
-
 function sendCreateActivity(array $note) {
     global $baseUrl, $username;
-
     $activity = [
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id' => $note['id'] . '/activity',
@@ -342,10 +421,8 @@ function sendCreateActivity(array $note) {
         'object' => $note,
         'to' => ['https://www.w3.org/ns/activitystreams#Public'],
     ];
-
     $followersFile = __DIR__ . '/followers.json';
     $followers = file_exists($followersFile) ? json_decode(file_get_contents($followersFile), true) : [];
-
     foreach ($followers as $follower) {
         $inbox = discoverInbox($follower);
         if ($inbox) {
