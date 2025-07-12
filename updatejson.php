@@ -1,6 +1,6 @@
 <?php
 
-$remoteUrl = 'https://alceawis.de/other/extra/scripts/fakesocialmedia/data_part_alcea.json';
+$remoteUrl = 'https://domain.com/.../data_part_alcea.json';
 $localFile = 'data_alcea.json';
 
 // Load remote JSON
