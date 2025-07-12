@@ -1,9 +1,11 @@
-<?php
 
-$remoteUrl = 'https://domain.com/.../data_part_alcea.json';
+
+
+<?php
+$remoteUrl = 'https://alceawis.de/other/extra/scripts/fakesocialmedia/data_part_alcea.json';
 $localFile = 'data_alcea.json';
 
-// Load remote JSON
+// Load remote data
 $remoteJson = file_get_contents($remoteUrl);
 if ($remoteJson === false) {
     die("Failed to load remote JSON.\n");
@@ -13,29 +15,23 @@ if ($remoteData === null) {
     die("Failed to decode remote JSON.\n");
 }
 
-// Ensure local JSON file exists
+// Load local data
 if (!file_exists($localFile)) {
     die("Local JSON file '$localFile' does not exist.\n");
 }
-
-// Load local JSON
 $localJson = file_get_contents($localFile);
 if ($localJson === false) {
     die("Failed to read local file '$localFile'.\n");
 }
-
-// Decode local JSON
 $localData = json_decode($localJson, true);
 if ($localData === null) {
     die("Failed to decode local JSON.\n");
 }
 
-// Function to compare if an entry exists in the local data
+// Compare function
 function entryExistsInLocalData(array $entry, array $localData): bool {
-    // Convert the entry to a string to compare it exactly as it is
     $entryStr = json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     foreach ($localData as $localEntry) {
-        // Compare string representations exactly
         if (json_encode($localEntry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) === $entryStr) {
             return true;
         }
@@ -43,34 +39,52 @@ function entryExistsInLocalData(array $entry, array $localData): bool {
     return false;
 }
 
-// Find new entries from remote with '•acws' in their value that don't exist locally
+// Sanitize content
+function sanitizeValue($value) {
+    return preg_replace_callback('/𒐫(.*?)𒐫/u', function ($matches) {
+        return "<blockquote>" . htmlspecialchars(trim($matches[1])) . "</blockquote>";
+    }, $value);
+}
+
+// Find new entries
 $newEntries = [];
 foreach ($remoteData as $entry) {
-    foreach ($entry as $date => $data) {
+    foreach ($entry as $date => &$data) {
         if (isset($data['value']) && strpos($data['value'], '•acws') !== false) {
-            // If entry does not already exist in local data, append it
             if (!entryExistsInLocalData($entry, $localData)) {
-                $newEntries[] = $entry;
+                $data['value'] = sanitizeValue($data['value']);
+                $newEntries[] = [$date => $data];
             }
         }
     }
 }
 
-// If new entries exist, prepend them to the local data
-if (count($newEntries) > 0) {
-    // Prepend new entries in original remote order
-    $updatedData = array_merge($newEntries, $localData);
-
-    // Save back to local file with exact formatting and no changes
-    $saved = file_put_contents($localFile, json_encode($updatedData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-    if ($saved === false) {
-        die("Failed to write updated data to local file.\n");
+// If accessed via POST, write data
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (count($newEntries) > 0) {
+        $updatedData = array_merge($newEntries, $localData);
+        $saved = file_put_contents($localFile, json_encode($updatedData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        if ($saved === false) {
+            die("Failed to write updated data to local file.\n");
+        }
+        echo "<p><strong>Prepended " . count($newEntries) . " new '•acws' entries to $localFile.</strong></p>";
+    } else {
+        echo "<p>No new entries to prepend.</p>";
     }
-
-    // Display the prepended entries
-    echo "Prepended " . count($newEntries) . " new '•acws' entries to $localFile:\n";
-    echo json_encode($newEntries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-} else {
-    echo "No new '•acws' entries to prepend.\n";
+    echo '<p><a href="' . htmlspecialchars($_SERVER['PHP_SELF']) . '">Back</a></p>';
+    exit;
 }
+
+// Show preview if GET
+echo "<h2>New '•acws' Entries Preview</h2>";
+if (count($newEntries) === 0) {
+    echo "<p>No new entries to prepend.</p>";
+    exit;
+}
+
+echo "<form method='post'>";
+echo "<pre>" . htmlspecialchars(json_encode($newEntries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . "</pre>";
+echo "<button type='submit'>Confirm and Prepend</button>";
+echo "</form>";
+?>
 
