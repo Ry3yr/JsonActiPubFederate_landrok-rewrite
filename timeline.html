@@ -1,96 +1,316 @@
-<meta charset="UTF-8">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-        .post {
-            border: 1px solid #ccc;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-        }
-        .post .content {
-            margin-bottom: 10px;
-        }
-        .post img {
-            max-height: 45px;
-        }
-        .emoji {
-            width: 45px;
-            height: 45px;
-        }
-        a {
-            color: #0073e6;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-    </style>
 
-<div id="timeline"></div>
-
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
+$(document).ready(function () {
+  const domain = window.location.hostname;
+  const federatedHandle = `${domain.split('.')[0]}@${domain}`;
+  const searchURL = `https://mastodon.social/search?q=${encodeURIComponent(federatedHandle)}&type=accounts`;
+  const checkLinkExistence = setInterval(function () {
+    const existingLink = $('a[href^="https://mastodon.social/search"]');
+   
+    if (existingLink.length > 0) {
+      clearInterval(checkLinkExistence);
+    } else {
+      const container = $('<div>').addClass('formClass');
+      const paragraph = $('<p>').text("You can follow this profile on Fediverse by typing the handle in your instance search or clicking this link:");
+      const link = $('<a>').attr('href', searchURL).attr('target', '_blank').text(federatedHandle);
+      container.append(paragraph, link);
+      $('body').prepend(container);
+      clearInterval(checkLinkExistence);
+    }
+  }, 1500);
+});
+</script><a target="_blank" href="https://mas.to/search?q=alceawis%40alceawis.com&type=accounts" style=color:pink>2</a><br>
+(Or use this <a target="_blank" href="https://mastodon.social/@alcea/114834785762248316" style=color:gray>post</a> as reference to find the profile. You can search for this url too!) <a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=40&text=Where%20%40alceawis%40alceawis." id=3936 style=color:green>Instance Compatibility</a> <a target="_blank" href="reportfollowers.php#https://alceawis.com/alceawis/followers" style=color:lightblue>Followers</a><br><hr>
+
+
+
+<!----Timeline Start--->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Alceawis Timeline</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: auto;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    .post {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 8px;
+      background-color: #fff;
+    }
+    .post .content {
+      margin-bottom: 10px;
+    }
+    .post img {
+      max-height: 45px;
+    }
+    .emoji {
+      width: 45px;
+      height: 45px;
+    }
+    a {
+      color: #0073e6;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .interactions {
+      margin-top: 10px;
+      font-size: 0.95em;
+      background-color: #f9f9f9;
+      padding: 8px;
+      border-radius: 5px;
+    }
+    .interactions strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+    ul {
+      padding-left: 20px;
+      margin: 5px 0;
+    }
+    li {
+      margin-bottom: 5px;
+    }
+    .reply-container {
+      margin-top: 8px;
+      border-left: 2px solid #ccc;
+      padding-left: 10px;
+    }
+    .reply {
+      background-color: #f0f2f5;
+      border-radius: 8px;
+      padding: 10px;
+      margin: 8px 0;
+      font-size: 0.9em;
+      transition: background-color 0.2s ease-in-out;
+    }
+    .reply:hover {
+      background-color: #e8ebf0;
+    }
+    .reply-meta {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    .reply-content {
+      margin-bottom: 6px;
+    }
+    .timestamp {
+      color: #666;
+      font-weight: normal;
+      font-size: 0.85em;
+    }
+    .reply-link {
+      font-size: 0.85em;
+      color: #0073e6;
+      text-decoration: none;
+    }
+    .reply-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>Alceawis Timeline</h1>
+  <div id="timeline"></div>
+  <button id="loadMoreBtn" style="display:none; margin-top: 20px;">Load More</button>
+
+  <script>
     const apiUrl = "https://alceawis.com/alceawis/outbox?page=true";
-    async function fetchTimeline() {
-        try {
-            const response = await fetch(apiUrl);
-            const data = await response.json();
-            if (data.orderedItems) {
-                displayTimeline(data.orderedItems);
+    const interactionUrl = `interaction.json?t=${Date.now()}`;
+
+    let allPosts = [];
+    let allInteractions = [];
+    let currentIndex = 0;
+    const initialLoad = 20;
+    const loadIncrement = 15;
+
+    const filterUrl = window.location.hash ? window.location.hash.substring(1) : null;
+
+
+    async function fetchTimelineAndInteractions() {
+      try {
+        const [postRes, interactionRes] = await Promise.all([
+          fetch(apiUrl),
+          fetch(interactionUrl)
+        ]);
+        const postData = await postRes.json();
+        const interactionData = await interactionRes.json();
+
+        if (postData.orderedItems) {
+          allPosts = postData.orderedItems;
+          allInteractions = interactionData;
+
+          if (filterUrl) {
+            const filtered = allPosts.filter(post => post.id === filterUrl);
+            if (filtered.length > 0) {
+              displayTimeline(filtered, allInteractions);
             } else {
-                console.log('No posts available.');
+              document.getElementById("timeline").innerHTML = "<p>Post not found.</p>";
             }
-        } catch (error) {
-            console.error('Error fetching timeline:', error);
+          } else {
+            displayNextPosts(initialLoad);
+          }
+        } else {
+          console.log("No posts available.");
         }
-    }
-    function displayTimeline(posts) {
-        const timelineContainer = document.getElementById("timeline");
-        timelineContainer.innerHTML = '';
-        posts.forEach(post => {
-            const postElement = document.createElement("div");
-            postElement.classList.add("post");
-            const content = parseContent(post.content);
-
-            postElement.innerHTML = `
-                <strong>@<a href="${post.attributedTo}" target="_blank">alceawis</a></strong><br>
-                <em>Published: ${new Date(post.published).toLocaleString()}</em><br>
-                <div class="content">${content}</div>
-                <a href="${post.id}" target="_blank">[link]</a> <!-- Use post.id for the link -->
-            `;
-
-            timelineContainer.appendChild(postElement);
-        });
+      } catch (error) {
+        console.error("Error loading data:", error);
+      }
     }
 
-    // Parse content to handle hashtags, emojis, and images
+    function displayNextPosts(count) {
+      const nextPosts = allPosts.slice(currentIndex, currentIndex + count);
+      displayTimeline(nextPosts, allInteractions);
+      currentIndex += count;
+
+      const loadMoreBtn = document.getElementById("loadMoreBtn");
+      if (currentIndex < allPosts.length) {
+        loadMoreBtn.style.display = "block";
+      } else {
+        loadMoreBtn.style.display = "none";
+      }
+    }
+
+    document.getElementById("loadMoreBtn").addEventListener("click", () => {
+      displayNextPosts(loadIncrement);
+    });
+
+    function displayTimeline(posts, interactions) {
+      const timelineContainer = document.getElementById("timeline");
+
+      posts.forEach(post => {
+        const postElement = document.createElement("div");
+        postElement.classList.add("post");
+
+        const content = parseContent(post.content);
+        const postId = post.id;
+
+        const likes = interactions.filter(i => i.type === "Like" && i.object === postId);
+        const rewts = interactions.filter(i => i.type === "Announce" && i.object === postId);
+        const replies = interactions.filter(i =>
+          i.type === "Create" && i.object?.inReplyTo === postId
+        );
+
+        const likesHtml = likes.length
+          ? `<strong>Likes:</strong> ${likes.map(like =>
+              `❤️ <a href="${like.actor}" target="_blank">${getHandle(like.actor)}</a>`
+            ).join(", ")}`
+          : "";
+
+        const rewtsHtml = rewts.length
+          ? `<strong>Rewts:</strong> ${rewts.map(r =>
+              `🔁 <a href="${r.actor}" target="_blank">${getHandle(r.actor)}</a>`
+            ).join(", ")}`
+          : "";
+
+        const repliesHtml = replies.length
+          ? `<strong>Replies:</strong>
+             <div class="reply-container">
+               ${replies.map(reply => {
+                 const actor = reply.actor || reply.object?.attributedTo;
+                 const postUrl = reply.object?.url || "#";
+                 const replyContent = parseContent(reply.object?.content || "");
+                 const published = reply.object?.published
+                   ? new Date(reply.object.published).toLocaleString()
+                   : '';
+                 return `<div class="reply">
+                           <div class="reply-meta">
+                             <a href="${actor}" target="_blank">${getHandle(actor)}</a> • <span class="timestamp">${published}</span>
+                           </div>
+                           <div class="reply-content">${replyContent}</div>
+                           <a class="reply-link" href="${postUrl}" target="_blank">View reply</a>
+                         </div>`;
+               }).join("")}
+             </div>`
+          : "";
+
+        const interactionSection = (likesHtml || rewtsHtml || repliesHtml)
+          ? `<div class="interactions">
+              ${likesHtml}
+              ${rewtsHtml}
+              ${repliesHtml}
+            </div>`
+          : "";
+
+        postElement.innerHTML = `
+          <strong>@<a href="${post.attributedTo}" target="_blank">alceawis</a></strong><br>
+          <em>Published: ${new Date(post.published).toLocaleString()}</em><br>
+          <div class="content">${content}</div>
+          <a href="${post.id}" target="_blank">[link]</a>
+          ${interactionSection}
+        `;
+
+        timelineContainer.appendChild(postElement);
+      });
+    }
+
     function parseContent(content) {
-        let parsedContent = content;
+      if (!content) return '';
+      let parsedContent = content;
 
-        // Replace hashtags with links to the corresponding tag pages
-        parsedContent = parsedContent.replace(/#([a-zA-Z0-9_]+)/g, (match, hashtag) => {
-            return `<a href="https://alceawis.com/tags/${hashtag}" target="_blank">${match}</a>`;
-        });
+      parsedContent = parsedContent.replace(/#([a-zA-Z0-9_]+)/g, (match, tag) => {
+        return `<a href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?text=${tag}&number=4000" target="_blank">${match}</a>`;
+      });
 
-        // Replace shorthand emojis like :emoji: with images **only in the content body**
-        parsedContent = parsedContent.replace(/:([a-zA-Z0-9_]+):/g, (match, emoji) => {
-            const emojiUrl = `https://alceawis.com/z_files/emojis/${emoji}.gif`;
-            return `<img src="${emojiUrl}" alt="${emoji}" class="emoji" />`;
-        });
+      parsedContent = parsedContent.replace(/:([a-zA-Z0-9_]+):/g, (match, emoji) => {
+        const emojiUrl = `https://alceawis.com/z_files/emojis/${emoji}.gif`;
+        return `<img src="${emojiUrl}" alt="${emoji}" class="emoji" />`;
+      });
 
-        // Embed images and resize them to 50% size
-        parsedContent = parsedContent.replace(/<a href="(https:\/\/[^\s]+(\.png|\.jpeg|\.jpg|\.gif))"[^>]*>/g, (match, imgUrl) => {
-            return `<img src="${imgUrl}" style="max-width: 50%;" />`;
-        });
+      parsedContent = parsedContent.replace(/<a href="(https:\/\/[^\s]+?\.(png|jpeg|jpg|gif))"[^>]*>/g, (match, imgUrl) => {
+        return `<img src="${imgUrl}" style="max-width: 50%;" />`;
+      });
 
-        return parsedContent;
+
+// Replace anchor tags that link to YouTube videos (except shorts) with iframe
+parsedContent = parsedContent.replace(/<a href="(https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]+))"[^>]*>.*?<\/a>/g, (match, url, videoId) => {
+  if (url.includes("youtube.com/shorts")) {
+    return `<a href="${url}" target="_blank" rel="nofollow noopener noreferrer">${url}</a>`;
+  }
+  return `
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" 
+      frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+    </iframe>`;
+});
+
+// Then replace any remaining plain YouTube URLs (not inside links)
+parsedContent = parsedContent.replace(/https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/g, (match, videoId) => {
+  if (match.includes("youtube.com/shorts")) {
+    return `<a href="${match}" target="_blank" rel="nofollow noopener noreferrer">${match}</a>`;
+  }
+  return `
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" 
+      frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+    </iframe>`;
+});
+
+
+
+      return parsedContent;
     }
 
-    // Call the function to fetch and display posts
-    fetchTimeline();
-</script>
+    function getHandle(actorUrl) {
+      try {
+        const url = new URL(actorUrl);
+        const username = url.pathname.split('/').pop();
+        return `@${username}@${url.hostname}`;
+      } catch {
+        return actorUrl;
+      }
+    }
 
+    fetchTimelineAndInteractions();
+  </script>
 </body>
 </html>
