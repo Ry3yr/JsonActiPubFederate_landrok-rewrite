@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Interaction JSON Parser</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  .item { border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+  .fav { background-color: pink; }
+  .reply { background-color: #add8e6; } /* light blue */
+  .boost { background-color: white; border: 1px solid #ccc; }
+  .header { font-weight: bold; margin-bottom: 6px; }
+  a { color: #0645ad; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div id="output">Loading data...</div>
+
+<script>
+  const output = document.getElementById('output');
+
+  async function fetchAndRender(url) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      renderData(data);
+    } catch (e) {
+      output.textContent = `Error loading JSON: ${e.message}`;
+    }
+  }
+
+  function createLink(url, text) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = text || url;
+    return a;
+  }
+
+  function renderData(data) {
+    output.innerHTML = '';
+    if (!Array.isArray(data)) {
+      output.textContent = 'JSON root is not an array.';
+      return;
+    }
+    // Reverse the order here
+    data.slice().reverse().forEach(item => {
+      const div = document.createElement('div');
+      div.classList.add('item');
+
+      if (item.type === 'Like') {
+        div.classList.add('fav');
+      } else if (item.type === 'Create') {
+        const obj = item.object;
+        const isReply = obj && obj.inReplyTo != null;
+        div.classList.add(isReply ? 'reply' : 'boost');
+      } else {
+        div.classList.add('boost');
+      }
+
+      const header = document.createElement('div');
+      header.classList.add('header');
+      header.textContent = `${item.type} - ${new Date(item.published).toLocaleString()}`;
+      div.appendChild(header);
+
+      const actorDiv = document.createElement('div');
+      actorDiv.textContent = 'Actor: ';
+      actorDiv.appendChild(createLink(item.actor));
+      div.appendChild(actorDiv);
+
+      if (item.type === 'Like') {
+        const objLink = createLink(item.object, 'Liked Object');
+        const objDiv = document.createElement('div');
+        objDiv.textContent = 'Object: ';
+        objDiv.appendChild(objLink);
+        div.appendChild(objDiv);
+      } else if (item.type === 'Create') {
+        const obj = item.object;
+        if (obj) {
+          if (obj.url) {
+            const urlDiv = document.createElement('div');
+            urlDiv.textContent = 'URL: ';
+            urlDiv.appendChild(createLink(obj.url));
+            div.appendChild(urlDiv);
+          }
+          if (obj.content) {
+            const contentDiv = document.createElement('div');
+            contentDiv.innerHTML = obj.content;
+            div.appendChild(contentDiv);
+          }
+          if (obj.inReplyTo) {
+            const replyDiv = document.createElement('div');
+            replyDiv.textContent = 'In Reply To: ';
+            replyDiv.appendChild(createLink(obj.inReplyTo));
+            div.appendChild(replyDiv);
+          }
+        }
+      } else {
+        const pre = document.createElement('pre');
+        pre.textContent = JSON.stringify(item, null, 2);
+        div.appendChild(pre);
+      }
+
+      output.appendChild(div);
+    });
+  }
+
+  fetchAndRender('interaction.json');
+</script>
+
+</body>
+</html>

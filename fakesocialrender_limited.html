@@ -5,29 +5,23 @@ $(document).ready(function () {
   const domain = window.location.hostname;
   const federatedHandle = `${domain.split('.')[0]}@${domain}`;
   const searchURL = `https://mastodon.social/search?q=${encodeURIComponent(federatedHandle)}&type=accounts`;
-
   const checkLinkExistence = setInterval(function () {
     const existingLink = $('a[href^="https://mastodon.social/search"]');
-    
+   
     if (existingLink.length > 0) {
-      // If the link exists, stop the retry mechanism and perform actions
       clearInterval(checkLinkExistence);
     } else {
-      // Create and append the elements if the link doesn't exist
       const container = $('<div>').addClass('formClass');
       const paragraph = $('<p>').text("You can follow this profile on Fediverse by typing the handle in your instance search or clicking this link:");
       const link = $('<a>').attr('href', searchURL).attr('target', '_blank').text(federatedHandle);
-
       container.append(paragraph, link);
       $('body').prepend(container);
-
-      clearInterval(checkLinkExistence); // Stop checking once the link is created
+      clearInterval(checkLinkExistence);
     }
-  }, 500); // Retry every 500ms
+  }, 1500);
 });
-
-</script><br><br>
-
+</script><a target="_blank" href="https://mas.to/search?q=alceawis%40alceawis.com&type=accounts" style=color:pink>2</a><br>
+(Or use this <a target="_blank" href="https://mastodon.social/@alcea/114834785762248316" style=color:gray>post</a> as reference to find the profile. You can search for this url too!) <a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=40&text=Where%20%40alceawis%40alceawis." id=3936 style=color:green>Instance Compatibility</a> <a target="_blank" href="reportfollowers.php#https://alceawis.com/alceawis/followers" style=color:lightblue>Followers</a><br><hr>
 
 
 <meta charset="UTF-8"> <!--for fixing quotes-->

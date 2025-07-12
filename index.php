@@ -24,6 +24,9 @@ $data = json_decode(file_get_contents(__DIR__ . '/data_alcea.json'), true);
 $pushedFile = __DIR__ . '/pushed.json';
 $pushed = file_exists($pushedFile) ? json_decode(file_get_contents($pushedFile), true) : [];
 $outboxItems = [];
+$interactionFile = __DIR__ . '/interaction.json';
+$interactions = file_exists($interactionFile) ? json_decode(file_get_contents($interactionFile), true) : [];
+
 function formatEmojis($text) {
     return $text; // Don't replace emoji shortcodes
 }
@@ -284,6 +287,7 @@ if ($uri === "/$username/inbox" || $uri === "/$username/inbox/") {
             exit;
         }
 
+        // Log Follow activities and handle followers
         if ($activity['type'] === 'Follow') {
             $follower = $activity['actor'] ?? null;
             $followId = $activity['id'] ?? null;
@@ -315,84 +319,76 @@ if ($uri === "/$username/inbox" || $uri === "/$username/inbox/") {
             }
         }
 
+        // Log Reply and Like (Favorite) activities to interaction.json
+        if (in_array($activity['type'], ['Like', 'Announce', 'Create'])) {
+            // 'Like' for fav, 'Announce' for boost/share, 'Create' can be reply if it contains 'inReplyTo'
+            $interaction = [
+                'id' => $activity['id'] ?? uniqid('interaction_'),
+                'type' => $activity['type'],
+                'actor' => $activity['actor'] ?? null,
+                'object' => $activity['object'] ?? null,
+                'published' => $activity['published'] ?? date(DATE_ATOM),
+                'received_at' => date(DATE_ATOM),
+            ];
+
+            // For 'Create' activities, only log if it is a reply (has inReplyTo)
+            if ($activity['type'] === 'Create') {
+                if (isset($activity['object']['inReplyTo']) && !empty($activity['object']['inReplyTo'])) {
+                    $interactions[] = $interaction;
+                }
+            } else {
+                $interactions[] = $interaction;
+            }
+            file_put_contents($interactionFile, json_encode($interactions, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
+
         http_response_code(202);
+        echo "Accepted";
         exit;
     } else {
         http_response_code(405);
-        header('Allow: POST');
         echo "Method Not Allowed";
         exit;
     }
 }
 
 http_response_code(404);
+echo "Not found";
 
-// === HELPER FUNCTIONS ===
-
-function discoverInbox($actorUrl) {
-    if (!str_ends_with($actorUrl, '.json')) {
-        $actorUrl = rtrim($actorUrl, '/') . '.json';
-    }
-    $opts = ['http' => ['method' => 'GET', 'header' => "Accept: application/activity+json, application/ld+json\r\n"]];
-    $context = stream_context_create($opts);
-    $json = @file_get_contents($actorUrl, false, $context);
-    if (!$json) {
-        file_put_contents(__DIR__ . '/inbox.log', "[" . date('c') . "] Failed to fetch actor JSON from $actorUrl\n", FILE_APPEND);
-        return null;
-    }
-    $actor = json_decode($json, true);
-    return $actor['inbox'] ?? null;
-}
-
-function sendSignedRequest($inboxUrl, $body) {
-    $keyId = "https://alceawis.com/alceawis#main-key";
-    $privateKeyPem = file_get_contents(__DIR__ . '/private.pem');
-    $date = gmdate('D, d M Y H:i:s \G\M\T');
-    $bodyJson = json_encode($body, JSON_UNESCAPED_SLASHES);
-    $digest = 'SHA-256=' . base64_encode(hash('sha256', $bodyJson, true));
-    $parsed = parse_url($inboxUrl);
-    $host = $parsed['host'];
-    $path = $parsed['path'];
-    $signatureString = "(request-target): post $path\nhost: $host\ndate: $date\ndigest: $digest";
-    openssl_sign($signatureString, $signature, $privateKeyPem, OPENSSL_ALGO_SHA256);
-    $signature_b64 = base64_encode($signature);
-    $signatureHeader = 'keyId="' . $keyId . '",algorithm="rsa-sha256",headers="(request-target) host date digest",signature="' . $signature_b64 . '"';
-    $headers = [
-        "Host: $host",
-        "Date: $date",
-        "Digest: $digest",
-        "Signature: $signatureHeader",
-        "Content-Type: application/activity+json"
-    ];
-    $ch = curl_init($inboxUrl);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $bodyJson);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    $response = curl_exec($ch);
-    if (curl_errno($ch)) {
-        file_put_contents(__DIR__ . '/inbox.log', "[" . date('c') . "] cURL error: " . curl_error($ch) . "\n", FILE_APPEND);
-    }
-    curl_close($ch);
-    return $response;
-}
-
-function sendCreateActivity(array $note) {
-    global $baseUrl, $username;
+function sendCreateActivity(array $note): void {
+    global $server, $username, $domain;
     $activity = [
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id' => $note['id'] . '/activity',
         'type' => 'Create',
-        'actor' => "$baseUrl/$username",
+        'actor' => "https://$domain/$username",
         'object' => $note,
         'to' => ['https://www.w3.org/ns/activitystreams#Public'],
     ];
-    $followersFile = __DIR__ . '/followers.json';
-    $followers = file_exists($followersFile) ? json_decode(file_get_contents($followersFile), true) : [];
-    foreach ($followers as $follower) {
-        $inbox = discoverInbox($follower);
-        if ($inbox) {
-            sendSignedRequest($inbox, $activity);
+    $server->deliver($activity);
+}
+
+function discoverInbox(string $actorUrl): ?string {
+    // Simple discovery via HTTP HEAD or GET - simplified here (could use HTTP client)
+    $headers = @get_headers($actorUrl, 1);
+    if (!$headers) {
+        return null;
+    }
+    if (isset($headers['Link'])) {
+        $linkHeaders = is_array($headers['Link']) ? $headers['Link'] : [$headers['Link']];
+        foreach ($linkHeaders as $link) {
+            if (preg_match('/<([^>]+)>;\s*rel="inbox"/i', $link, $m)) {
+                return $m[1];
+            }
         }
     }
+    // Fallback: append /inbox to actor URL
+    return rtrim($actorUrl, '/') . '/inbox';
 }
+
+function sendSignedRequest(string $url, array $activity): void {
+    // This should send a signed HTTP POST request using server's keys - simplified:
+    global $server;
+    $server->deliver($activity, $url);
+}
+?>
