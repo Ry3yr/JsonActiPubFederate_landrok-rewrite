@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# Redirect /users/username to /username dynamically
+RewriteRule ^users/([^/]+)/?$ /$1 [R=301,L]
+
 # Add CORS headers to all responses
 <IfModule mod_headers.c>
     Header set Access-Control-Allow-Origin "*"
