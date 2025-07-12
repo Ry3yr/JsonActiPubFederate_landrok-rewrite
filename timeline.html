@@ -1,0 +1,96 @@
+<meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .post {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .post .content {
+            margin-bottom: 10px;
+        }
+        .post img {
+            max-height: 45px;
+        }
+        .emoji {
+            width: 45px;
+            height: 45px;
+        }
+        a {
+            color: #0073e6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+
+<div id="timeline"></div>
+
+<script>
+    const apiUrl = "https://alceawis.com/alceawis/outbox?page=true";
+    async function fetchTimeline() {
+        try {
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+            if (data.orderedItems) {
+                displayTimeline(data.orderedItems);
+            } else {
+                console.log('No posts available.');
+            }
+        } catch (error) {
+            console.error('Error fetching timeline:', error);
+        }
+    }
+    function displayTimeline(posts) {
+        const timelineContainer = document.getElementById("timeline");
+        timelineContainer.innerHTML = '';
+        posts.forEach(post => {
+            const postElement = document.createElement("div");
+            postElement.classList.add("post");
+            const content = parseContent(post.content);
+
+            postElement.innerHTML = `
+                <strong>@<a href="${post.attributedTo}" target="_blank">alceawis</a></strong><br>
+                <em>Published: ${new Date(post.published).toLocaleString()}</em><br>
+                <div class="content">${content}</div>
+                <a href="${post.id}" target="_blank">[link]</a> <!-- Use post.id for the link -->
+            `;
+
+            timelineContainer.appendChild(postElement);
+        });
+    }
+
+    // Parse content to handle hashtags, emojis, and images
+    function parseContent(content) {
+        let parsedContent = content;
+
+        // Replace hashtags with links to the corresponding tag pages
+        parsedContent = parsedContent.replace(/#([a-zA-Z0-9_]+)/g, (match, hashtag) => {
+            return `<a href="https://alceawis.com/tags/${hashtag}" target="_blank">${match}</a>`;
+        });
+
+        // Replace shorthand emojis like :emoji: with images **only in the content body**
+        parsedContent = parsedContent.replace(/:([a-zA-Z0-9_]+):/g, (match, emoji) => {
+            const emojiUrl = `https://alceawis.com/z_files/emojis/${emoji}.gif`;
+            return `<img src="${emojiUrl}" alt="${emoji}" class="emoji" />`;
+        });
+
+        // Embed images and resize them to 50% size
+        parsedContent = parsedContent.replace(/<a href="(https:\/\/[^\s]+(\.png|\.jpeg|\.jpg|\.gif))"[^>]*>/g, (match, imgUrl) => {
+            return `<img src="${imgUrl}" style="max-width: 50%;" />`;
+        });
+
+        return parsedContent;
+    }
+
+    // Call the function to fetch and display posts
+    fetchTimeline();
+</script>
+
+</body>
+</html>
