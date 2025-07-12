@@ -7,32 +7,6 @@ if ($currentDomain == $rootDomain && $requestUri == '/') {
     echo '<script type="text/javascript">$(document).ready(function(){$("#tl").load("https://alceawis.com/fakesocialrender_limited.html");});</script>' . PHP_EOL;
     echo '<div class="formClass"><div id="tl"></div></div>' . PHP_EOL;}
 ?>
-<?php
-// Get the current domain
-$currentDomain = $_SERVER['HTTP_HOST'];
-
-// Check if the domain is the root domain
-$rootDomain = 'example.com'; // Replace with your actual root domain
-
-if ($currentDomain == $rootDomain) {
-    ?>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script type="text/javascript">
-        $(document).ready(function(){
-            $("#tl").load("https://alceawis.com/fakesocialrender_limited.html");
-        });
-    </script>
-    <div class="formClass">
-        <div id="tl"></div>
-    </div>
-    <?php
-} else {
-    // Optionally, di
-}
-?>
-
-
-
 
 <?php
 file_put_contents(__DIR__ . '/debug.log', "[" . date('c') . "] REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n", FILE_APPEND);
@@ -41,26 +15,24 @@ if (!file_exists($autoloadPath)) {
     die("Error: Autoload file not found at $autoloadPath\n");
 }
 require $autoloadPath;
-
 use ActivityPhp\Server;
-
 $domain = 'alceawis.com';
 $username = 'alceawis';
 $baseUrl = "https://$domain";
-
 $server = new Server();
-
 $data = json_decode(file_get_contents(__DIR__ . '/data_alcea.json'), true);
 $pushedFile = __DIR__ . '/pushed.json';
 $pushed = file_exists($pushedFile) ? json_decode(file_get_contents($pushedFile), true) : [];
-
 $outboxItems = [];
-
-// Helper function to format emoji (unchanged)
 function formatEmojis($text) {
     return $text; // Don't replace emoji shortcodes
 }
-
+function formatQuotes($text) {
+    return preg_replace_callback('/𒐫(.*?)𒐫/s', function ($matches) {
+        $quoted = htmlspecialchars(trim($matches[1]));
+        return "<blockquote>$quoted</blockquote>";
+    }, $text);
+}
 function formatDescriptionLinks(string $text): string {
     $escaped = htmlspecialchars($text);
     $html = preg_replace(
@@ -76,11 +48,13 @@ foreach ($data as $entry) {
         $hash = substr(md5($content['value']), 0, 8);
         $text = formatEmojis($content['value']);
         $hashtags = array_filter(array_map('trim', explode(',', $content['hashtags'] ?? '')));
-        $escapedText = htmlspecialchars($text);
+        //$escapedText = htmlspecialchars($text);
+        //$quotedText = formatQuotes($escapedText);
+        $quotedText = formatQuotes($text);
         $htmlText = preg_replace(
             '~(https?://[^\s<]+)~i',
             '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>',
-            $escapedText
+            $quotedText
         );
         $htmlText = preg_replace_callback('/#([\w-]+)/', function($matches) use ($domain) {
             $tag = $matches[1];
@@ -96,7 +70,6 @@ foreach ($data as $entry) {
             ];
         }, $hashtags);
 
-        // Emoji tags
         preg_match_all('/:([a-zA-Z0-9_]+):/', $content['value'], $emojiMatches);
         $emojiTags = [];
         foreach ($emojiMatches[1] as $shortcode) {
@@ -121,13 +94,10 @@ foreach ($data as $entry) {
             'published' => date(DATE_ATOM, strtotime($date)),
             'attributedTo' => "$baseUrl/$username",
             'to' => ['https://www.w3.org/ns/activitystreams#Public'],
-
-            // THIS IS THE IMPORTANT PART:
-            'content' => $htmlText,  // content with clickable links
-
+            'content' => $htmlText,
             'contentMap' => [
-                'und' => $text,       // plain text version
-                'html' => $htmlText,  // html version with links
+                'und' => $text,
+                'html' => $htmlText,
             ],
             'tag' => $tags,
         ];
@@ -145,7 +115,6 @@ foreach ($data as $entry) {
 $uri = $_SERVER['REQUEST_URI'] ?? '';
 $uri = explode('?', $uri)[0];
 
-// === ACTOR ENDPOINT ===
 if ($uri === "/$username" || $uri === "/$username/") {
     header('Content-Type: application/activity+json');
     header('Vary: Accept');
@@ -169,8 +138,8 @@ if ($uri === "/$username" || $uri === "/$username/") {
         'type' => 'Person',
         'name' => 'Alcea Bot',
         'preferredUsername' => $username,
-        'summary' => $descriptionHtml,        // Add description with clickable links
-        'icon' => [                         // Add profile picture
+        'summary' => $descriptionHtml,
+        'icon' => [
             'type' => 'Image',
             'mediaType' => 'image/gif',
             'url' => "$baseUrl/z_files/emojis/alceawis.gif",
@@ -187,7 +156,6 @@ if ($uri === "/$username" || $uri === "/$username/") {
     exit;
 }
 
-// === OUTBOX ENDPOINT ===
 if ($uri === "/$username/outbox" || $uri === "/$username/outbox/") {
     header('Content-Type: application/activity+json');
 
@@ -231,8 +199,6 @@ if ($uri === "/$username/outbox" || $uri === "/$username/outbox/") {
     exit;
 }
 
-
-// === GET POST ENDPOINT ===
 if (preg_match('/^\/' . $username . '\/status\/([a-z0-9\-]+)$/', $uri, $matches)) {
     $postId = $matches[1];
     $data = json_decode(file_get_contents(__DIR__ . '/data_alcea.json'), true);
@@ -249,12 +215,13 @@ if (preg_match('/^\/' . $username . '\/status\/([a-z0-9\-]+)$/', $uri, $matches)
     if ($post) {
         $text = formatEmojis($post['value']);
         $escapedText = htmlspecialchars($text);
+        $quotedText = formatQuotes($escapedText);
         $htmlText = preg_replace(
             '~(https?://[^\s<]+)~i',
             '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>',
-            $escapedText
+            $quotedText
         );
-        $noteId = "$baseUrl/$username/status/{$date}-$hash"; // Build the ID
+        $noteId = "$baseUrl/$username/status/{$date}-$hash";
         $tags = array_map(function($tag) use ($domain) {
             return [
                 'type' => 'Hashtag',
@@ -269,10 +236,10 @@ if (preg_match('/^\/' . $username . '\/status\/([a-z0-9\-]+)$/', $uri, $matches)
             'published' => date(DATE_ATOM, strtotime($date)),
             'attributedTo' => "$baseUrl/$username",
             'to' => ['https://www.w3.org/ns/activitystreams#Public'],
-            'content' => $htmlText,  // HTML formatted content with clickable links
+            'content' => $htmlText,
             'contentMap' => [
-                'und' => $post['value'],       // plain text version
-                'html' => $htmlText,  // html version with links
+                'und' => $post['value'],
+                'html' => $htmlText,
             ],
             'tag' => $tags,
         ];
@@ -286,7 +253,6 @@ if (preg_match('/^\/' . $username . '\/status\/([a-z0-9\-]+)$/', $uri, $matches)
     }
 }
 
-// === FOLLOWERS ENDPOINT ===
 if ($uri === "/$username/followers" || $uri === "/$username/followers/") {
     header('Content-Type: application/activity+json');
     header('Vary: Accept');
@@ -304,7 +270,6 @@ if ($uri === "/$username/followers" || $uri === "/$username/followers/") {
     exit;
 }
 
-// === INBOX ENDPOINT ===
 if ($uri === "/$username/inbox" || $uri === "/$username/inbox/") {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $payload = file_get_contents('php://input');
@@ -359,9 +324,7 @@ if ($uri === "/$username/inbox" || $uri === "/$username/inbox/") {
     }
 }
 
-// === 404 ===
 http_response_code(404);
-echo "Not found";
 
 // === HELPER FUNCTIONS ===
 
@@ -379,6 +342,7 @@ function discoverInbox($actorUrl) {
     $actor = json_decode($json, true);
     return $actor['inbox'] ?? null;
 }
+
 function sendSignedRequest($inboxUrl, $body) {
     $keyId = "https://alceawis.com/alceawis#main-key";
     $privateKeyPem = file_get_contents(__DIR__ . '/private.pem');
@@ -411,6 +375,7 @@ function sendSignedRequest($inboxUrl, $body) {
     curl_close($ch);
     return $response;
 }
+
 function sendCreateActivity(array $note) {
     global $baseUrl, $username;
     $activity = [
