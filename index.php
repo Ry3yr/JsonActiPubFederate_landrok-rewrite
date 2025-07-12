@@ -29,7 +29,8 @@ function formatEmojis($text) {
 }
 function formatQuotes($text) {
     return preg_replace_callback('/𒐫(.*?)𒐫/s', function ($matches) {
-        $quoted = htmlspecialchars(trim($matches[1]));
+        //$quoted = htmlspecialchars(trim($matches[1]));
+        $quoted = trim($matches[1]);
         return "<blockquote>$quoted</blockquote>";
     }, $text);
 }
