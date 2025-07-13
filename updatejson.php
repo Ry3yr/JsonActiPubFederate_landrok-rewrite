@@ -1,80 +1,107 @@
+<p id="warning" style="color:red; display:none;">Cannot confirm: the symbol 𒐫 is still present in the JSON to append.</p>
+<script>
+function checkForSymbol() {
+    const toAppendElems = document.querySelectorAll('.to-append');
+    let found = false;
+    toAppendElems.forEach(el => {
+        if (el.textContent.includes('𒐫')) found = true;
+    });
+    const confirmBtn = document.getElementById('confirm-btn');
+    const warning = document.getElementById('warning');
+    if (found) {
+        confirmBtn.disabled = true;
+        warning.style.display = 'block';
+    } else {
+        confirmBtn.disabled = false;
+        warning.style.display = 'none';
+    }
+}
+document.addEventListener('DOMContentLoaded', checkForSymbol);
+</script>
+
+
+
 
 <?php
-session_set_cookie_params(['secure' => true,'httponly' => true,'samesite' => 'Strict']);
+session_set_cookie_params(['secure' => true, 'httponly' => true, 'samesite' => 'Strict']);
 session_start();
-$session_lifetime = 3 * 60; // Session timeout
+$session_lifetime = 3 * 60;
 $correct_username = "admin";
 $correct_password_hash = '$2y$10$S9naYnE6MqP14zVRfIsig.A98jBGzEImaGLgKVuiSGKpI7yr7XeGG'; // password: 4869
-//echo password_hash("pass", PASSWORD_DEFAULT); //generate
-if (isset($_GET['logout'])) {
-session_unset();
-session_destroy();
-header("Location: " . $_SERVER['PHP_SELF']);
-exit;
-}
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['heartbeat'])) {
-$_SESSION['last_activity'] = time();
-exit;
-}
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-$username = $_POST['username'] ?? '';
-$password = $_POST['password'] ?? '';
-if ($username === $correct_username && password_verify($password, $correct_password_hash)) {
-session_regenerate_id(true);
-$_SESSION['logged_in'] = true;
-$_SESSION['last_activity'] = time();
-header("Location: " . $_SERVER['PHP_SELF']);
-exit;
-} else {
-$error = "Invalid username or password.";
-}
-}
-?>
-<?php if (isset($error)) echo "<p style='color:red;'>$error</p>"; ?>
-<form method="post">
-<label>Username: <input name="username" required></label><br>
-<label>Password: <input type="password" name="password" required></label><br>
-<button type="submit">Login</button>
-</form>
 
-<?php
-exit;
+if (isset($_GET['logout'])) {
+    session_unset();
+    session_destroy();
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
 }
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['heartbeat'])) {
+    $_SESSION['last_activity'] = time();
+    exit;
+}
+
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $username = $_POST['username'] ?? '';
+        $password = $_POST['password'] ?? '';
+        if ($username === $correct_username && password_verify($password, $correct_password_hash)) {
+            session_regenerate_id(true);
+            $_SESSION['logged_in'] = true;
+            $_SESSION['last_activity'] = time();
+            header("Location: " . $_SERVER['PHP_SELF']);
+            exit;
+        } else {
+            $error = "Invalid username or password.";
+        }
+    }
+    ?>
+    <?php if (isset($error)) echo "<p style='color:red;'>$error</p>"; ?>
+    <form method="post">
+        <label>Username: <input name="username" required></label><br>
+        <label>Password: <input type="password" name="password" required></label><br>
+        <button type="submit">Login</button>
+    </form>
+    <?php
+    exit;
+}
+
 if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $session_lifetime) {
-session_unset();
-session_destroy();
-header("Location: " . $_SERVER['PHP_SELF']);
-exit;
+    session_unset();
+    session_destroy();
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
 }
-$_SESSION['last_activity'] = time(); // Refresh session activity
+
+$_SESSION['last_activity'] = time();
 $remaining_time = ($_SESSION['last_activity'] + $session_lifetime) - time();
 ?>
+
 Welcome, you are logged in! <span id="countdown"></span><hr>
 <a href="?logout=1">Logout</a>
 <script>
 let remaining = <?php echo $remaining_time; ?>;
 function updateCountdown() {
-if (remaining <= 0) {
-clearInterval(timer);
-alert("Session expired due to inactivity.");
-location.reload();
-return;
-}
-const minutes = Math.floor(remaining / 60);
-const seconds = remaining % 60;
-document.getElementById('countdown').textContent =
-minutes + "m " + (seconds < 10 ? "0" : "") + seconds + "s";
-remaining--;
+    if (remaining <= 0) {
+        clearInterval(timer);
+        alert("Session expired due to inactivity.");
+        location.reload();
+        return;
+    }
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
+    document.getElementById('countdown').textContent =
+        minutes + "m " + (seconds < 10 ? "0" : "") + seconds + "s";
+    remaining--;
 }
 updateCountdown();
 const timer = setInterval(updateCountdown, 1000);
 setInterval(() => {
-fetch("", {
-method: "POST",
-headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-body: "heartbeat=1"
-});
+    fetch("", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: "heartbeat=1"
+    });
 }, 30000);
 </script>
 
@@ -83,33 +110,28 @@ $remoteUrl = 'https://alceawis.de/other/extra/scripts/fakesocialmedia/data_part_
 $localFile = 'data_alcea.json';
 
 function convertToBlockquoteTags(string $text): string {
-    return preg_replace('/𒐫(.*?)𒐫/u', '<blockquote>$1</blockquote>', $text);
+    return preg_replace('/𒐫(.*?)𒐫/us', '<blockquote>$1</blockquote>', $text);
 }
 
 function convertToUnicodeEnclosure(string $text): string {
-    return preg_replace('/<blockquote>(.*?)<\/blockquote>/u', '𒐫$1𒐫', $text);
+    return preg_replace('/<blockquote>(.*?)<\/blockquote>/us', '𒐫$1𒐫', $text);
 }
 
-function convertDataToOutputFormat(array $data): array {
-    foreach ($data as $key => $val) {
-        if (is_array($val)) {
-            $data[$key] = convertDataToOutputFormat($val);
-        } elseif ($key === 'value' && is_string($val)) {
-            $data[$key] = convertToBlockquoteTags($val);
+function array_map_recursive(callable $callback, $array) {
+    foreach ($array as $key => $value) {
+        if (is_array($value)) {
+            $array[$key] = array_map_recursive($callback, $value);
+        } else {
+            $array[$key] = $callback($value);
         }
     }
-    return $data;
+    return $array;
 }
 
 function convertDataToCompareFormat(array $data): array {
-    foreach ($data as $key => $val) {
-        if (is_array($val)) {
-            $data[$key] = convertDataToCompareFormat($val);
-        } elseif ($key === 'value' && is_string($val)) {
-            $data[$key] = convertToUnicodeEnclosure($val);
-        }
-    }
-    return $data;
+    return array_map_recursive(function ($v) {
+        return is_string($v) ? convertToUnicodeEnclosure($v) : $v;
+    }, $data);
 }
 
 function entryExists(array $entry, array $local): bool {
@@ -121,13 +143,13 @@ function entryExists(array $entry, array $local): bool {
     return false;
 }
 
-// --- Load remote ---
+// Load remote
 $remoteJson = file_get_contents($remoteUrl);
 if (!$remoteJson) die(" Failed to load remote JSON.");
 $remoteRaw = json_decode($remoteJson, true);
 if (!is_array($remoteRaw)) die(" Failed to decode remote JSON.");
 
-// --- Load local ---
+// Load local
 if (!file_exists($localFile)) die(" Local JSON file '$localFile' not found.");
 $localJson = file_get_contents($localFile);
 $localRaw = json_decode($localJson, true);
@@ -136,14 +158,16 @@ if (!is_array($localRaw)) die(" Failed to decode local JSON.");
 // Normalize local for comparison
 $localForCompare = array_map('convertDataToCompareFormat', $localRaw);
 
-// --- Find new entries ---
+// Find new entries
 $newRemoteEntries = [];
 
 foreach ($remoteRaw as $entry) {
     foreach ($entry as $payload) {
         if (isset($payload['value']) && strpos($payload['value'], '•acws') !== false) {
             $original = $entry;
-            $converted = convertDataToOutputFormat($entry);
+            $converted = array_map_recursive(function ($v) {
+                return is_string($v) ? convertToBlockquoteTags($v) : $v;
+            }, $entry);
             if (!entryExists(convertDataToCompareFormat($converted), $localForCompare)) {
                 $newRemoteEntries[] = [
                     'original' => $original,
@@ -155,7 +179,7 @@ foreach ($remoteRaw as $entry) {
     }
 }
 
-// --- If form confirmed ---
+// Confirm save
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
     if (count($newRemoteEntries) > 0) {
         $newConverted = array_map(fn($e) => $e['to_append'], $newRemoteEntries);
@@ -193,10 +217,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
 <body>
 
 <h1>New <code>•acws</code> Entries</h1>
-
 <?php if (count($newRemoteEntries) > 0): ?>
     <p><strong><?php echo count($newRemoteEntries); ?></strong> new entries found in remote file not present in local.</p>
-
     <?php foreach ($newRemoteEntries as $index => $entryPair): ?>
         <div class="entry-pair">
             <div>
@@ -211,7 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
     <?php endforeach; ?>
 
     <form method="post">
-        <button name="confirm" type="submit"> Confirm Append</button>
+        <button id="confirm-btn" name="confirm" type="submit">Confirm Append</button>
     </form>
 <?php else: ?>
     <p>No new <code>•acws</code> entries found.</p>
