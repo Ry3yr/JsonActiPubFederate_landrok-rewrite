@@ -148,7 +148,7 @@ $uri = explode('?', $_SERVER['REQUEST_URI'] ?? '')[0];
 if ($uri === "/$username" || $uri === "/$username/") {
     header('Content-Type: application/activity+json');
     header('Vary: Accept');
-    $descHtml = formatDescriptionLinks("This is **Alcea's** semi‑automated profile! It fetches from a local timeline at https://alceawis.com.");
+    $descHtml = formatDescriptionLinks("This is **Alcea's** semi‑automated profile! It fetches from a local timeline at https://alceawis.com");
     echo json_encode([
         '@context'          => ['https://www.w3.org/ns/activitystreams',['manuallyApprovesFollowers'=>'as:manuallyApprovesFollowers','toot'=>'http://joinmastodon.org/ns#','featured'=>['@id'=>'toot:featured','@type'=>'@id']]],
         'id'                => "$baseUrl/$username",
@@ -276,11 +276,26 @@ if ($uri === "/$username/inbox" || $uri === "/$username/inbox/") {
             'published'   => $activity['published'] ?? date(DATE_ATOM),
             'received_at' => date(DATE_ATOM),
         ];
-        if ($activity['type'] === 'Create') {
-            if (!empty($activity['object']['inReplyTo'])) $interactions[] = $interaction;
-        } else {
-            $interactions[] = $interaction;
+if ($activity['type'] === 'Create') {
+    $mentionsYou = false;
+    if (isset($activity['object']['tag']) && is_array($activity['object']['tag'])) {
+        foreach ($activity['object']['tag'] as $tag) {
+            if (
+                isset($tag['type'], $tag['href']) &&
+                $tag['type'] === 'Mention' &&
+                rtrim($tag['href'], '/') === "$baseUrl/$username"
+            ) {
+                $mentionsYou = true;
+                break;
+            }
         }
+    }
+    if (!empty($activity['object']['inReplyTo']) || $mentionsYou) {
+        $interactions[] = $interaction;
+    }
+} else {
+    $interactions[] = $interaction;
+}
         file_put_contents($interactionFile, json_encode($interactions, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 
