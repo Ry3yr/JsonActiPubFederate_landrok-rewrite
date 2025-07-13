@@ -1,18 +1,95 @@
+
+<?php
+session_set_cookie_params(['secure' => true,'httponly' => true,'samesite' => 'Strict']);
+session_start();
+$session_lifetime = 3 * 60; // Session timeout
+$correct_username = "admin";
+$correct_password_hash = '$2y$10$S9naYnE6MqP14zVRfIsig.A98jBGzEImaGLgKVuiSGKpI7yr7XeGG'; // password: 4869
+//echo password_hash("pass", PASSWORD_DEFAULT); //generate
+if (isset($_GET['logout'])) {
+session_unset();
+session_destroy();
+header("Location: " . $_SERVER['PHP_SELF']);
+exit;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['heartbeat'])) {
+$_SESSION['last_activity'] = time();
+exit;
+}
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$username = $_POST['username'] ?? '';
+$password = $_POST['password'] ?? '';
+if ($username === $correct_username && password_verify($password, $correct_password_hash)) {
+session_regenerate_id(true);
+$_SESSION['logged_in'] = true;
+$_SESSION['last_activity'] = time();
+header("Location: " . $_SERVER['PHP_SELF']);
+exit;
+} else {
+$error = "Invalid username or password.";
+}
+}
+?>
+<?php if (isset($error)) echo "<p style='color:red;'>$error</p>"; ?>
+<form method="post">
+<label>Username: <input name="username" required></label><br>
+<label>Password: <input type="password" name="password" required></label><br>
+<button type="submit">Login</button>
+</form>
+
+<?php
+exit;
+}
+if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $session_lifetime) {
+session_unset();
+session_destroy();
+header("Location: " . $_SERVER['PHP_SELF']);
+exit;
+}
+$_SESSION['last_activity'] = time(); // Refresh session activity
+$remaining_time = ($_SESSION['last_activity'] + $session_lifetime) - time();
+?>
+Welcome, you are logged in! <span id="countdown"></span><hr>
+<a href="?logout=1">Logout</a>
+<script>
+let remaining = <?php echo $remaining_time; ?>;
+function updateCountdown() {
+if (remaining <= 0) {
+clearInterval(timer);
+alert("Session expired due to inactivity.");
+location.reload();
+return;
+}
+const minutes = Math.floor(remaining / 60);
+const seconds = remaining % 60;
+document.getElementById('countdown').textContent =
+minutes + "m " + (seconds < 10 ? "0" : "") + seconds + "s";
+remaining--;
+}
+updateCountdown();
+const timer = setInterval(updateCountdown, 1000);
+setInterval(() => {
+fetch("", {
+method: "POST",
+headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+body: "heartbeat=1"
+});
+}, 30000);
+</script>
+
 <?php
 $remoteUrl = 'https://alceawis.de/other/extra/scripts/fakesocialmedia/data_part_alcea.json';
 $localFile = 'data_alcea.json';
 
-// 𒐫text𒐫 → <blockquote>text</blockquote>
 function convertToBlockquoteTags(string $text): string {
     return preg_replace('/𒐫(.*?)𒐫/u', '<blockquote>$1</blockquote>', $text);
 }
 
-// <blockquote>text</blockquote> → 𒐫text𒐫
 function convertToUnicodeEnclosure(string $text): string {
     return preg_replace('/<blockquote>(.*?)<\/blockquote>/u', '𒐫$1𒐫', $text);
 }
 
-// Apply blockquote conversion for saving
 function convertDataToOutputFormat(array $data): array {
     foreach ($data as $key => $val) {
         if (is_array($val)) {
@@ -24,7 +101,6 @@ function convertDataToOutputFormat(array $data): array {
     return $data;
 }
 
-// Apply unicode enclosure for comparison
 function convertDataToCompareFormat(array $data): array {
     foreach ($data as $key => $val) {
         if (is_array($val)) {
@@ -36,7 +112,6 @@ function convertDataToCompareFormat(array $data): array {
     return $data;
 }
 
-// Check if entry exists (deep comparison using json_encode)
 function entryExists(array $entry, array $local): bool {
     $needle = json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     foreach ($local as $item) {
@@ -65,14 +140,17 @@ $localForCompare = array_map('convertDataToCompareFormat', $localRaw);
 $newRemoteEntries = [];
 
 foreach ($remoteRaw as $entry) {
-    // Only consider if any 'value' contains •acws
     foreach ($entry as $payload) {
         if (isset($payload['value']) && strpos($payload['value'], '•acws') !== false) {
-            $compareEntry = convertDataToCompareFormat($entry);
-            if (!entryExists($compareEntry, $localForCompare)) {
-                $newRemoteEntries[] = $entry;
+            $original = $entry;
+            $converted = convertDataToOutputFormat($entry);
+            if (!entryExists(convertDataToCompareFormat($converted), $localForCompare)) {
+                $newRemoteEntries[] = [
+                    'original' => $original,
+                    'to_append' => $converted
+                ];
             }
-            break; // stop after finding •acws in this entry
+            break;
         }
     }
 }
@@ -80,9 +158,8 @@ foreach ($remoteRaw as $entry) {
 // --- If form confirmed ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
     if (count($newRemoteEntries) > 0) {
-        // Convert 𒐫 to <blockquote> for saving
-        $convertedForSave = array_map('convertDataToOutputFormat', $newRemoteEntries);
-        $newData = array_merge($convertedForSave, $localRaw);
+        $newConverted = array_map(fn($e) => $e['to_append'], $newRemoteEntries);
+        $newData = array_merge($newConverted, $localRaw);
 
         $written = file_put_contents(
             $localFile,
@@ -92,8 +169,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
         if ($written === false) {
             echo "<p style='color:red;'>Failed to write to local file.</p>";
         } else {
-            echo "<p style='color:green;'>Added " . count($convertedForSave) . " new entries to <code>$localFile</code>.</p>";
-            $newRemoteEntries = []; // prevent re-showing
+            echo "<p style='color:green;'>Added " . count($newConverted) . " new entries to <code>$localFile</code>.</p>";
+            $newRemoteEntries = [];
         }
     }
 }
@@ -105,9 +182,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
     <meta charset="UTF-8">
     <title>Review New •acws Entries</title>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 2em auto; }
+        body { font-family: sans-serif; max-width: 1000px; margin: 2em auto; }
         pre { background: #f5f5f5; padding: 1em; border-radius: 5px; white-space: pre-wrap; }
+        .entry-pair { display: flex; gap: 20px; margin-bottom: 2em; }
+        .entry-pair > div { width: 50%; }
         button { padding: 0.6em 1em; font-size: 1em; cursor: pointer; }
+        h2 { margin-top: 3em; }
     </style>
 </head>
 <body>
@@ -116,7 +196,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
 
 <?php if (count($newRemoteEntries) > 0): ?>
     <p><strong><?php echo count($newRemoteEntries); ?></strong> new entries found in remote file not present in local.</p>
-    <pre><?php echo htmlspecialchars(json_encode($newRemoteEntries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?></pre>
+
+    <?php foreach ($newRemoteEntries as $index => $entryPair): ?>
+        <div class="entry-pair">
+            <div>
+                <h2>Original Message #<?php echo $index + 1; ?></h2>
+                <pre><?php echo htmlspecialchars(json_encode($entryPair['original'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?></pre>
+            </div>
+            <div>
+                <h2>JSON to be Appended</h2>
+                <pre><?php echo htmlspecialchars(json_encode($entryPair['to_append'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?></pre>
+            </div>
+        </div>
+    <?php endforeach; ?>
 
     <form method="post">
         <button name="confirm" type="submit"> Confirm Append</button>
