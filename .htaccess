@@ -9,9 +9,8 @@ RewriteEngine On
 
 # Match /alceawis/status/* URLs
 RewriteCond %{REQUEST_URI} ^/alceawis/status/.+$
-# If the referer is exactly from alceawis.com (or any subpath of it)
 RewriteCond %{HTTP_REFERER} ^https?://(www\.)?alceawis\.com [NC]
-RewriteRule ^alceawis/status/(.+)$ https://alceawis.com/alceawis/status/$1 [R=301,L]
+RewriteRule ^alceawis/status/(.+)$ /_https://alceawis.com/alceawis/status/$1 [R=301,L]
 
 
 # Redirect /users/username to /username dynamically
