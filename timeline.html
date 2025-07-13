@@ -1,4 +1,3 @@
-
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 $(document).ready(function () {
@@ -7,7 +6,6 @@ $(document).ready(function () {
   const searchURL = `https://mastodon.social/search?q=${encodeURIComponent(federatedHandle)}&type=accounts`;
   const checkLinkExistence = setInterval(function () {
     const existingLink = $('a[href^="https://mastodon.social/search"]');
-   
     if (existingLink.length > 0) {
       clearInterval(checkLinkExistence);
     } else {
@@ -21,23 +19,73 @@ $(document).ready(function () {
   }, 1500);
 });
 </script><a target="_blank" href="https://mas.to/search?q=alceawis%40alceawis.com&type=accounts" style=color:pink>2</a><br>
-(Or use this <a target="_blank" href="https://mastodon.social/@alcea/114834785762248316" style=color:gray>post</a> as reference to find the profile. You can search for this url too!) <a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=40&text=Where%20%40alceawis%40alceawis." id=3936 style=color:green>Instance Compatibility</a> <a target="_blank" href="reportfollowers.php#https://alceawis.com/alceawis/followers" style=color:lightblue>Followers</a><br><hr>
+(Or use this <a target="_blank" href="https://mastodon.social/@alcea/114834785762248316" style=color:gray>post</a> as reference to find the profile. You can search for this url too!) <a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=40&text=Where%20%40alceawis%40alceawis." id=3936 style=color:green>Instance Compatibility</a><hr>
+<!-----Debug---->
+<details><summary>Debug</summary>
+<a target="_blank" href="debug.log" style=color:blue>debug.log</a><br>
+<a target="_blank" href="inbox.log" style=color:blue>inbox.log</a><br>
+•<a href="https://alceawis.com/api/v1/custom_emojis" target="_blank" rel="noopener noreferrer">Emoji Endpoint</a><br>
+•<a href="https://alceawis.com/api/v1/statuses/20250713-f441340a" target="_blank" rel="noopener noreferrer">v1 Statuses API</a><br>
+•<a href="https://alceawis.com/alceawis/followers" target="_blank" rel="noopener noreferrer">Followers</a><br>
+•<a href="https://alceawis.com/alceawis/outbox?page=true" target="_blank" rel="noopener noreferrer">User Timeline (Outbox, paged)</a><br>
+</details>
 
 
+<!--Profile-->
+<div style="
+    position: fixed;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 20px;
+    background-color: #fff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;">
+    <div style="width: 120px; height: 120px; padding: 0px; border: 2px solid #ccc; border-radius: 50%; overflow: hidden; margin-bottom: 20px;">
+        <img src="/z_files/emojis/alceawis.gif" alt="Image" style="width: 100%; height: 100%; object-fit: cover;">
+    </div>
+    <div style="text-align: center;">
+        <p>Hi I'm <a target="_blank" href="https://alceawis.de" style=color:pink>Alcea</a>'s Relay Page</p>
+        <p>This is a federation site for</p>
+        <p> <a target="_blank" href="https://alceawis.de/about" style=color:pink>my site</a>'s timeline</p>
+        <hr>
+          <div id="followerCount"></div><script>fetch('https://alceawis.com/alceawis/followers').then(res => res.json()).then(data => document.getElementById('followerCount').innerHTML = `<a href="https://alceawis.com/reportfollowers.php#https://alceawis.com/alceawis/followers" target="_blank" style="color:pink;">Followers: ${data.orderedItems.length}</a>`).catch(err => console.error('Error:', err));</script>
+        <div id="postCount"></div><script>fetch('https://alceawis.com/alceawis/outbox').then(res => res.json()).then(data => document.getElementById('postCount').innerHTML = `<a href="#" target="_blank" style="color:pink;">Posts: ${data.totalItems}</a>`).catch(err => console.error('Error:', err));</script>
+        <!--<a target="_blank" href="#" style="display: block; margin: 5px; color: #D5006D; text-decoration: none;">-</a>-->
+        <hr>
+               <a target="_blank" href="https://mastodon.social/@alcea" style="display: block; margin: 5px; color: #D5006D; text-decoration: none;">@alcea@mastodon.social</a>
+    </div>
+</div>
 
-<!----Timeline Start--->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Alceawis Timeline</title>
+  <title>Alcea's Timeline</title>
   <style>
+    @keyframes colorCycle {
+      0% {
+        color: #ff69b4; /* Light Pink */
+      }
+      50% {
+        color: #d5006c; /* Dark Pink */
+      }
+      100% {
+        color: #ff69b4; /* Light Pink */
+      }
+    }
+    h1 {
+      animation: colorCycle 5s infinite ease-in-out;
+    }
     body {
       font-family: Arial, sans-serif;
       max-width: 800px;
       margin: auto;
       padding: 20px;
-      background-color: #f4f4f4;
     }
     .post {
       border: 1px solid #ccc;
@@ -118,38 +166,55 @@ $(document).ready(function () {
     .reply-link:hover {
       text-decoration: underline;
     }
+    .green-link {
+      color: green;
+    }
+    #debug-info {
+      margin-top: 20px;
+      background-color: #f0f0f0;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 0.9em;
+      color: red;
+    }
   </style>
 </head>
 <body>
-  <h1>Alceawis Timeline</h1>
+  <h1>Alcea's Timeline</h1>
+  [<a href="/" style="color:red">...</a>]
   <div id="timeline"></div>
   <button id="loadMoreBtn" style="display:none; margin-top: 20px;">Load More</button>
-
+  <div id="debug-info"></div>
   <script>
     const apiUrl = "https://alceawis.com/alceawis/outbox?page=true";
     const interactionUrl = `interaction.json?t=${Date.now()}`;
-
+    const pushedJsonUrl = "pushed.json?t=${Date.now()}";
     let allPosts = [];
     let allInteractions = [];
+    let pushedLinks = [];
     let currentIndex = 0;
     const initialLoad = 20;
     const loadIncrement = 15;
 
     const filterUrl = window.location.hash ? window.location.hash.substring(1) : null;
 
-
     async function fetchTimelineAndInteractions() {
       try {
-        const [postRes, interactionRes] = await Promise.all([
+        const [postRes, interactionRes, pushedRes] = await Promise.all([
           fetch(apiUrl),
-          fetch(interactionUrl)
+          fetch(interactionUrl),
+          fetch(pushedJsonUrl)
         ]);
+
         const postData = await postRes.json();
         const interactionData = await interactionRes.json();
+        const pushedData = await pushedRes.json();
 
         if (postData.orderedItems) {
           allPosts = postData.orderedItems;
           allInteractions = interactionData;
+          pushedLinks = pushedData;
 
           if (filterUrl) {
             const filtered = allPosts.filter(post => post.id === filterUrl);
@@ -190,17 +255,40 @@ $(document).ready(function () {
       const timelineContainer = document.getElementById("timeline");
 
       posts.forEach(post => {
-        const postElement = document.createElement("div");
-        postElement.classList.add("post");
-
         const content = parseContent(post.content);
         const postId = post.id;
 
         const likes = interactions.filter(i => i.type === "Like" && i.object === postId);
         const rewts = interactions.filter(i => i.type === "Announce" && i.object === postId);
-        const replies = interactions.filter(i =>
-          i.type === "Create" && i.object?.inReplyTo === postId
-        );
+function collectReplies(postId, interactions, depth = 0) {
+  const replies = interactions.filter(i =>
+    i.type === "Create" && i.object?.inReplyTo === postId
+  );
+
+  const html = replies.map(reply => {
+    const actor = reply.actor || reply.object?.attributedTo;
+    const postUrl = reply.object?.url || "#";
+    const replyContent = parseContent(reply.object?.content || "");
+    const published = reply.object?.published
+      ? new Date(reply.object.published).toLocaleString()
+      : '';
+
+    const childReplies = collectReplies(reply.object?.id, interactions, depth + 1);
+
+    return `<div class="reply" style="margin-left: ${depth * 20}px;">
+              <div class="reply-meta">
+                <a href="${actor}" target="_blank">${getHandle(actor)}</a> • <span class="timestamp">${published}</span>
+              </div>
+              <div class="reply-content">${replyContent}</div>
+              <a class="reply-link" href="${postUrl}" target="_blank">View reply</a>
+              <a class="reply-link" href="https://alceawis.de/searchmastourl.html?search=${postUrl}" target="_blank">Rslv</a>
+              ${childReplies}
+            </div>`;
+  }).join("");
+
+  return html;
+}
+
 
         const likesHtml = likes.length
           ? `<strong>Likes:</strong> ${likes.map(like =>
@@ -214,26 +302,8 @@ $(document).ready(function () {
             ).join(", ")}`
           : "";
 
-        const repliesHtml = replies.length
-          ? `<strong>Replies:</strong>
-             <div class="reply-container">
-               ${replies.map(reply => {
-                 const actor = reply.actor || reply.object?.attributedTo;
-                 const postUrl = reply.object?.url || "#";
-                 const replyContent = parseContent(reply.object?.content || "");
-                 const published = reply.object?.published
-                   ? new Date(reply.object.published).toLocaleString()
-                   : '';
-                 return `<div class="reply">
-                           <div class="reply-meta">
-                             <a href="${actor}" target="_blank">${getHandle(actor)}</a> • <span class="timestamp">${published}</span>
-                           </div>
-                           <div class="reply-content">${replyContent}</div>
-                           <a class="reply-link" href="${postUrl}" target="_blank">View reply</a>
-                         </div>`;
-               }).join("")}
-             </div>`
-          : "";
+const repliesHtml = collectReplies(postId, interactions);
+
 
         const interactionSection = (likesHtml || rewtsHtml || repliesHtml)
           ? `<div class="interactions">
@@ -243,15 +313,33 @@ $(document).ready(function () {
             </div>`
           : "";
 
+        const postElement = document.createElement("div");
+        postElement.classList.add("post");
         postElement.innerHTML = `
           <strong>@<a href="${post.attributedTo}" target="_blank">alceawis</a></strong><br>
           <em>Published: ${new Date(post.published).toLocaleString()}</em><br>
           <div class="content">${content}</div>
           <a href="${post.id}" target="_blank">[link]</a>
+           <!--<a href="https://alceawis.com/api/v1/statuses/" target="_blank">[post-id]</a>-->
           ${interactionSection}
         `;
 
         timelineContainer.appendChild(postElement);
+      });
+
+      // After rendering posts, compare links with pushed data
+      compareLinksToPushed();
+    }
+
+    function compareLinksToPushed() {
+      const allLinks = document.querySelectorAll("a[href]");
+      allLinks.forEach(link => {
+        const postUrl = link.getAttribute("href");
+        const isPushed = pushedLinks.some(linkUrl => normalizeUrl(postUrl) === normalizeUrl(linkUrl));
+
+        if (isPushed) {
+          link.classList.add("green-link"); // Add green class if matched
+        }
       });
     }
 
@@ -272,32 +360,31 @@ $(document).ready(function () {
         return `<img src="${imgUrl}" style="max-width: 50%;" />`;
       });
 
-
-// Replace anchor tags that link to YouTube videos (except shorts) with iframe
-parsedContent = parsedContent.replace(/<a href="(https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]+))"[^>]*>.*?<\/a>/g, (match, url, videoId) => {
-  if (url.includes("youtube.com/shorts")) {
-    return `<a href="${url}" target="_blank" rel="nofollow noopener noreferrer">${url}</a>`;
+parsedContent = parsedContent.replace(
+  /<a href="(https:\/\/(www|m)\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]+))"[^>]*>.*?<\/a>/g,
+  (match, url, subdomain, videoId) => {
+    if (url.includes("youtube.com/shorts")) {
+      // Optional: handle shorts differently or skip
+      return match;  // return original link without iframe
+    }
+    return `
+      <a href="${url}" target="_blank" rel="nofollow noopener noreferrer">${url}</a>
+      <iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}"
+        frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+      </iframe>`;
   }
-  return `
-    <iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" 
-      frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
-    </iframe>`;
-});
-
-// Then replace any remaining plain YouTube URLs (not inside links)
-parsedContent = parsedContent.replace(/https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/g, (match, videoId) => {
-  if (match.includes("youtube.com/shorts")) {
-    return `<a href="${match}" target="_blank" rel="nofollow noopener noreferrer">${match}</a>`;
-  }
-  return `
-    <iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" 
-      frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
-    </iframe>`;
-});
-
+);
 
 
       return parsedContent;
+    }
+
+    function normalizeUrl(url) {
+      try {
+        return new URL(url).toString().replace(/\/+$/, ''); // remove trailing slashes
+      } catch {
+        return url.trim();
+      }
     }
 
     function getHandle(actorUrl) {
@@ -314,3 +401,5 @@ parsedContent = parsedContent.replace(/https:\/\/www\.youtube\.com\/watch\?v=([a
   </script>
 </body>
 </html>
+
+
