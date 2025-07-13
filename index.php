@@ -1,4 +1,13 @@
 <?php
+//redirect v1/statuses/id calls to status
+$request_uri = $_SERVER['REQUEST_URI'];
+if (preg_match('#^/api/v1/statuses/([^/]+)#', $request_uri, $matches)) {
+    $status_id = $matches[1];
+    header("Location: https://alceawis.com/alceawis/status/$status_id?redirected");
+    exit();
+}?>
+<?php
+// Replace "_" with "#" for post resolution
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 if (strpos($requestUri, '/_https://') === 0) {
     $newUri = str_replace('/_https://', '/#https://', $requestUri);
@@ -7,6 +16,7 @@ if (strpos($requestUri, '/_https://') === 0) {
 }
 ?>
 <?php
+//load timeline if root url
 $currentDomain = $_SERVER['HTTP_HOST'];
 $requestUri = $_SERVER['REQUEST_URI'];
 $rootDomain = 'alceawis.com'; // Replace with your actual root domain
@@ -16,19 +26,14 @@ if ($currentDomain == $rootDomain && $requestUri == '/') {
     echo '<div class="formClass"><div id="tl"></div></div>' . PHP_EOL;}
 ?>
 
-
-
 <?php
 file_put_contents(__DIR__ . '/debug.log', "[" . date('c') . "] REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? '') . "\n", FILE_APPEND);
-
 $autoloadPath = __DIR__ . '/vendor/autoload.php';
 if (!file_exists($autoloadPath)) {
     die("Error: Autoload file not found at $autoloadPath\n");
 }
 require $autoloadPath;
-
 use ActivityPhp\Server;
-
 $domain      = 'alceawis.com';
 $username    = 'alceawis';
 $baseUrl     = "https://$domain";
@@ -118,6 +123,7 @@ foreach ($data as $entry) {
         $noteId = "$baseUrl/$username/status/{$date}-$hash";
         $note   = [
             'id'           => $noteId,
+            'url'          => $noteId, //added to maybe improve outbox
             'type'         => 'Note',
             'published'    => date(DATE_ATOM, strtotime($date)),
             'attributedTo' => "$baseUrl/$username",
@@ -194,6 +200,7 @@ if (preg_match('/^\/' . $username . '\/status\/([a-z0-9\-]+)$/', $uri, $m)) {
     $note  = [
         '@context'      => 'https://www.w3.org/ns/activitystreams',
         'id'            => "$baseUrl/$username/status/{$date}-$hash",
+        'url'           => "$baseUrl/$username/status/{$date}-$hash",
         'type'          => 'Note',
         'published'     => date(DATE_ATOM, strtotime($date)),
         'attributedTo'  => "$baseUrl/$username",
