@@ -12,7 +12,6 @@ RewriteCond %{REQUEST_URI} ^/alceawis/status/.+$
 RewriteCond %{HTTP_REFERER} ^https?://(www\.)?alceawis\.com [NC]
 RewriteRule ^alceawis/status/(.+)$ /_https://alceawis.com/alceawis/status/$1 [R=301,L]
 
-
 # Redirect /users/username to /username dynamically
 RewriteRule ^users/([^/]+)/?$ /$1 [R=301,L]
 
@@ -22,6 +21,12 @@ RewriteRule ^@([^/]+)$ /$1 [R=302,L]
 # Match any request URI that contains "custom_emojis"
 RewriteCond %{REQUEST_URI} custom_emojis
 RewriteRule ^.*$ custom_emojis.php [L,QSA]
+
+
+# If the request URI contains "nodeinfo" (including under .well-known), rewrite to /nodeinfo.php
+RewriteCond %{REQUEST_URI} nodeinfo
+RewriteRule ^.*$ nodeinfo.php [L,QSA]
+
 
 # Route all requests except existing files or directories to index.php
 RewriteCond %{REQUEST_FILENAME} !-f
