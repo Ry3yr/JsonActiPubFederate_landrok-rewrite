@@ -25,7 +25,9 @@ RewriteRule ^.*$ custom_emojis.php [L,QSA]
 # Redirect /api/v1/instance/peers to peers.php
 RewriteRule ^api/v1/instance/peers$ peers.php [L,QSA]
 
-
+# Redirect /api/v1/instance requests to instance.php
+RewriteCond %{REQUEST_URI} ^/api/v1/instance$
+RewriteRule ^api/v1/instance$ /instance.php [L,QSA]
 
 # If the request URI contains "nodeinfo" (including under .well-known), rewrite to /nodeinfo.php
 RewriteCond %{REQUEST_URI} nodeinfo
