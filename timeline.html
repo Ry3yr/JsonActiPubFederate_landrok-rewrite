@@ -19,15 +19,18 @@ $(document).ready(function () {
   }, 1500);
 });
 </script><a target="_blank" href="https://mas.to/search?q=alceawis%40alceawis.com&type=accounts" style=color:pink>2</a><br>
-(Or use this <a target="_blank" href="https://mastodon.social/@alcea/114834785762248316" style=color:gray>post</a> as reference to find the profile. You can search for this url too!) <a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=40&text=Where%20%40alceawis%40alceawis." id=3936 style=color:green>Instance Compatibility</a><hr>
+(Or use this <a target="_blank" href="https://mastodon.social/@alcea/114834785762248316" style=color:gray>post</a> as reference to find the profile. You can search for this url too!) <a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=4000&text=Where%20%40alceawis%40alceawis." id=3936 style=color:green>Instance Compatibility</a><hr>
 <!-----Debug---->
 <details><summary>Debug</summary>
 <a target="_blank" href="debug.log" style=color:blue>debug.log</a><br>
 <a target="_blank" href="inbox.log" style=color:blue>inbox.log</a><br>
+<a target="_blank" href="https://alceawis.com/emojifetch.php" style=color:blue>Emoji Downloader</a><br>
 •<a href="https://alceawis.com/api/v1/custom_emojis" target="_blank" rel="noopener noreferrer">Emoji Endpoint</a><br>
 •<a href="https://alceawis.com/api/v1/statuses/20250713-f441340a" target="_blank" rel="noopener noreferrer">v1 Statuses API</a><br>
 •<a href="https://alceawis.com/alceawis/followers" target="_blank" rel="noopener noreferrer">Followers</a><br>
 •<a href="https://alceawis.com/alceawis/outbox?page=true" target="_blank" rel="noopener noreferrer">User Timeline (Outbox, paged)</a><br>
+<hr>
+  <div id="debug-info"></div>
 </details>
 
 
@@ -92,7 +95,7 @@ $(document).ready(function () {
       padding: 15px;
       margin: 10px 0;
       border-radius: 8px;
-      background-color: #fff;
+      background-color: #FFB6C1;
     }
     .post .content {
       margin-bottom: 10px;
@@ -105,7 +108,7 @@ $(document).ready(function () {
       height: 45px;
     }
     a {
-      color: #0073e6;
+      color: #D5006D;
       text-decoration: none;
     }
     a:hover {
@@ -185,221 +188,271 @@ $(document).ready(function () {
   [<a href="/" style="color:red">...</a>]
   <div id="timeline"></div>
   <button id="loadMoreBtn" style="display:none; margin-top: 20px;">Load More</button>
-  <div id="debug-info"></div>
-  <script>
-    const apiUrl = "https://alceawis.com/alceawis/outbox?page=true";
-    const interactionUrl = `interaction.json?t=${Date.now()}`;
-    const pushedJsonUrl = "pushed.json?t=${Date.now()}";
-    let allPosts = [];
-    let allInteractions = [];
-    let pushedLinks = [];
-    let currentIndex = 0;
-    const initialLoad = 20;
-    const loadIncrement = 15;
+<script>
+(function(){
+  const debugDiv = document.getElementById("debug-info");
 
-    const filterUrl = window.location.hash ? window.location.hash.substring(1) : null;
+  function logToDOM(message, type = "log") {
+    if (!debugDiv) return;
+    const line = document.createElement("div");
+    line.textContent = message;
+    if (type === "error") line.style.color = "red";
+    debugDiv.appendChild(line);
+  }
 
-    async function fetchTimelineAndInteractions() {
+  const originalConsoleLog = console.log;
+  const originalConsoleError = console.error;
+
+  console.log = function(...args) {
+    originalConsoleLog.apply(console, args);
+    logToDOM(args.join(" "), "log");
+  };
+
+  console.error = function(...args) {
+    originalConsoleError.apply(console, args);
+    logToDOM(args.join(" "), "error");
+  };
+})();
+
+  const apiUrl = "https://alceawis.com/alceawis/outbox?page=true";
+  const interactionUrl = `interaction.json?t=${Date.now()}`;
+  const pushedJsonUrl = `pushed.json?t=${Date.now()}`;
+  let allPosts = [];
+  let allInteractions = [];
+  let pushedLinks = [];
+  let currentIndex = 0;
+  const initialLoad = 20;
+  const loadIncrement = 15;
+
+  const filterUrl = window.location.hash ? window.location.hash.substring(1) : null;
+
+  function logToDOM(message) {
+    const debugDiv = document.getElementById("debug-info");
+    const line = document.createElement("div");
+    line.textContent = `[debug] ${message}`;
+    debugDiv.appendChild(line);
+  }
+
+  async function fetchTimelineAndInteractions() {
+    try {
+      const postRes = await fetch(apiUrl);
+      const interactionRaw = await fetch(interactionUrl).then(r => r.text());
+      const pushedRaw = await fetch(pushedJsonUrl).then(r => r.text());
+
+      logToDOM(`Fetched interaction.json (first 200 chars): ${interactionRaw.substring(0, 200)}`);
+      logToDOM(`Fetched pushed.json (first 200 chars): ${pushedRaw.substring(0, 200)}`);
+
+      let postData = await postRes.json();
+      logToDOM(`Fetched posts: ${postData.orderedItems?.length || 0}`);
+
+      let interactionData = [];
+      let pushedData = [];
+
       try {
-        const [postRes, interactionRes, pushedRes] = await Promise.all([
-          fetch(apiUrl),
-          fetch(interactionUrl),
-          fetch(pushedJsonUrl)
-        ]);
+        interactionData = JSON.parse(interactionRaw);
+        logToDOM("Parsed interaction.json successfully.");
+      } catch (e) {
+        logToDOM(`❌ Failed to parse interaction.json: ${e.message}`);
+      }
 
-        const postData = await postRes.json();
-        const interactionData = await interactionRes.json();
-        const pushedData = await pushedRes.json();
+      try {
+        pushedData = JSON.parse(pushedRaw);
+        logToDOM("Parsed pushed.json successfully.");
+      } catch (e) {
+        logToDOM(`❌ Failed to parse pushed.json: ${e.message}`);
+      }
 
-        if (postData.orderedItems) {
-          allPosts = postData.orderedItems;
-          allInteractions = interactionData;
-          pushedLinks = pushedData;
+      allPosts = postData.orderedItems || [];
+      allInteractions = interactionData;
+      pushedLinks = pushedData;
 
-          if (filterUrl) {
-            const filtered = allPosts.filter(post => post.id === filterUrl);
-            if (filtered.length > 0) {
-              displayTimeline(filtered, allInteractions);
-            } else {
-              document.getElementById("timeline").innerHTML = "<p>Post not found.</p>";
-            }
-          } else {
-            displayNextPosts(initialLoad);
-          }
+      if (filterUrl) {
+        const filtered = allPosts.filter(post => post.id === filterUrl);
+        if (filtered.length > 0) {
+          displayTimeline(filtered, allInteractions);
         } else {
-          console.log("No posts available.");
+          document.getElementById("timeline").innerHTML = "<p>Post not found.</p>";
         }
-      } catch (error) {
-        console.error("Error loading data:", error);
-      }
-    }
-
-    function displayNextPosts(count) {
-      const nextPosts = allPosts.slice(currentIndex, currentIndex + count);
-      displayTimeline(nextPosts, allInteractions);
-      currentIndex += count;
-
-      const loadMoreBtn = document.getElementById("loadMoreBtn");
-      if (currentIndex < allPosts.length) {
-        loadMoreBtn.style.display = "block";
       } else {
-        loadMoreBtn.style.display = "none";
+        displayNextPosts(initialLoad);
       }
+    } catch (error) {
+      console.error("Error loading data:", error);
+      logToDOM("❌ General fetch error — check console for stack trace.");
     }
+  }
 
-    document.getElementById("loadMoreBtn").addEventListener("click", () => {
-      displayNextPosts(loadIncrement);
+  function displayNextPosts(count) {
+    const nextPosts = allPosts.slice(currentIndex, currentIndex + count);
+    displayTimeline(nextPosts, allInteractions);
+    currentIndex += count;
+
+    logToDOM(`Displaying ${nextPosts.length} posts. currentIndex: ${currentIndex}, total: ${allPosts.length}`);
+
+    const loadMoreBtn = document.getElementById("loadMoreBtn");
+    if (currentIndex < allPosts.length) {
+      loadMoreBtn.style.display = "block";
+      logToDOM("✔️ Showed Load More button");
+    } else {
+      loadMoreBtn.style.display = "none";
+      logToDOM("✔️ All posts loaded. Hiding Load More button.");
+    }
+  }
+
+  document.getElementById("loadMoreBtn").addEventListener("click", () => {
+    logToDOM("🟢 Load More button clicked");
+    displayNextPosts(loadIncrement);
+  });
+
+  function displayTimeline(posts, interactions) {
+    const timelineContainer = document.getElementById("timeline");
+
+    posts.forEach(post => {
+      const content = parseContent(post.content);
+      const postId = post.id;
+
+      const likes = interactions.filter(i => i.type === "Like" && i.object === postId);
+      const rewts = interactions.filter(i => i.type === "Announce" && i.object === postId);
+      const repliesHtml = collectReplies(postId, interactions);
+
+      const likesHtml = likes.length
+        ? `<strong>Likes:</strong> ${likes.map(like =>
+            `❤️ <a href="${like.actor}" target="_blank">${getHandle(like.actor)}</a>`
+          ).join(", ")}`
+        : "";
+
+      const rewtsHtml = rewts.length
+        ? `<strong>Rewts:</strong> ${rewts.map(r =>
+            `🔁 <a href="${r.actor}" target="_blank">${getHandle(r.actor)}</a>`
+          ).join(", ")}`
+        : "";
+
+      const interactionSection = (likesHtml || rewtsHtml || repliesHtml)
+        ? `<div class="interactions">
+            ${likesHtml}
+            ${rewtsHtml}
+            ${repliesHtml}
+          </div>`
+        : "";
+
+      const postElement = document.createElement("div");
+      postElement.classList.add("post");
+      postElement.innerHTML = `
+        <strong>@<a href="${post.attributedTo}" target="_blank">alceawis</a></strong><br>
+        <em>Published: ${new Date(post.published).toLocaleString()}</em><br>
+        <div class="content">${content}</div>
+        <a href="${post.id}" target="_blank">[link]</a>
+        ${interactionSection}
+      `;
+
+      timelineContainer.appendChild(postElement);
     });
 
-    function displayTimeline(posts, interactions) {
-      const timelineContainer = document.getElementById("timeline");
+    compareLinksToPushed();
+  }
 
-      posts.forEach(post => {
-        const content = parseContent(post.content);
-        const postId = post.id;
+  function collectReplies(postId, interactions, depth = 0) {
+    const replies = interactions.filter(i =>
+      i.type === "Create" && i.object?.inReplyTo === postId
+    );
 
-        const likes = interactions.filter(i => i.type === "Like" && i.object === postId);
-        const rewts = interactions.filter(i => i.type === "Announce" && i.object === postId);
-function collectReplies(postId, interactions, depth = 0) {
-  const replies = interactions.filter(i =>
-    i.type === "Create" && i.object?.inReplyTo === postId
-  );
+    return replies.map(reply => {
+      const actor = reply.actor || reply.object?.attributedTo;
+      const postUrl = reply.object?.url || "#";
+      const replyContent = parseContent(reply.object?.content || "");
+      const published = reply.object?.published
+        ? new Date(reply.object.published).toLocaleString()
+        : '';
 
-  const html = replies.map(reply => {
-    const actor = reply.actor || reply.object?.attributedTo;
-    const postUrl = reply.object?.url || "#";
-    const replyContent = parseContent(reply.object?.content || "");
-    const published = reply.object?.published
-      ? new Date(reply.object.published).toLocaleString()
-      : '';
+      const childReplies = collectReplies(reply.object?.id, interactions, depth + 1);
 
-    const childReplies = collectReplies(reply.object?.id, interactions, depth + 1);
+      return `<div class="reply" style="margin-left: ${depth * 20}px;">
+                <div class="reply-meta">
+                  <a href="${actor}" target="_blank">${getHandle(actor)}</a> • <span class="timestamp">${published}</span>
+                </div>
+                <div class="reply-content">${replyContent}</div>
+                <a class="reply-link" href="${postUrl}" target="_blank">View reply</a>
+                <a class="reply-link" href="https://alceawis.de/searchmastourl.html?search=${postUrl}" target="_blank">Rslv</a>
+                ${childReplies}
+              </div>`;
+    }).join("");
+  }
 
-    return `<div class="reply" style="margin-left: ${depth * 20}px;">
-              <div class="reply-meta">
-                <a href="${actor}" target="_blank">${getHandle(actor)}</a> • <span class="timestamp">${published}</span>
-              </div>
-              <div class="reply-content">${replyContent}</div>
-              <a class="reply-link" href="${postUrl}" target="_blank">View reply</a>
-              <a class="reply-link" href="https://alceawis.de/searchmastourl.html?search=${postUrl}" target="_blank">Rslv</a>
-              ${childReplies}
-            </div>`;
-  }).join("");
+  function compareLinksToPushed() {
+  const allLinks = document.querySelectorAll("a[href]");
+  allLinks.forEach(link => {
+    const postUrl = link.getAttribute("href");
+    if (!postUrl) return; // skip if href is null or empty
 
-  return html;
+    const isPushed = pushedLinks.some(linkUrl => normalizeUrl(postUrl) === normalizeUrl(linkUrl));
+    if (isPushed) {
+      link.classList.add("green-link"); // Add green class if matched
+    }
+  });
 }
 
 
-        const likesHtml = likes.length
-          ? `<strong>Likes:</strong> ${likes.map(like =>
-              `❤️ <a href="${like.actor}" target="_blank">${getHandle(like.actor)}</a>`
-            ).join(", ")}`
-          : "";
+  function parseContent(content) {
+    if (!content) return '';
+    let parsedContent = content;
 
-        const rewtsHtml = rewts.length
-          ? `<strong>Rewts:</strong> ${rewts.map(r =>
-              `🔁 <a href="${r.actor}" target="_blank">${getHandle(r.actor)}</a>`
-            ).join(", ")}`
-          : "";
+    parsedContent = parsedContent.replace(/#([a-zA-Z0-9_]+)/g, (match, tag) => {
+      return `<a href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?text=${tag}&number=4000" target="_blank">${match}</a>`;
+    });
 
-const repliesHtml = collectReplies(postId, interactions);
+    parsedContent = parsedContent.replace(/:([a-zA-Z0-9_]+):/g, (match, emoji) => {
+      const emojiUrl = `https://alceawis.com/z_files/emojis/${emoji}.gif`;
+      return `<img src="${emojiUrl}" alt="${emoji}" class="emoji" />`;
+    });
 
+    parsedContent = parsedContent.replace(/<a href="(https:\/\/[^\s]+?\.(png|jpeg|jpg|gif))"[^>]*>/g, (match, imgUrl) => {
+      return `<img src="${imgUrl}" style="max-width: 50%;" />`;
+    });
 
-        const interactionSection = (likesHtml || rewtsHtml || repliesHtml)
-          ? `<div class="interactions">
-              ${likesHtml}
-              ${rewtsHtml}
-              ${repliesHtml}
-            </div>`
-          : "";
-
-        const postElement = document.createElement("div");
-        postElement.classList.add("post");
-        postElement.innerHTML = `
-          <strong>@<a href="${post.attributedTo}" target="_blank">alceawis</a></strong><br>
-          <em>Published: ${new Date(post.published).toLocaleString()}</em><br>
-          <div class="content">${content}</div>
-          <a href="${post.id}" target="_blank">[link]</a>
-           <!--<a href="https://alceawis.com/api/v1/statuses/" target="_blank">[post-id]</a>-->
-          ${interactionSection}
-        `;
-
-        timelineContainer.appendChild(postElement);
-      });
-
-      // After rendering posts, compare links with pushed data
-      compareLinksToPushed();
-    }
-
-    function compareLinksToPushed() {
-      const allLinks = document.querySelectorAll("a[href]");
-      allLinks.forEach(link => {
-        const postUrl = link.getAttribute("href");
-        const isPushed = pushedLinks.some(linkUrl => normalizeUrl(postUrl) === normalizeUrl(linkUrl));
-
-        if (isPushed) {
-          link.classList.add("green-link"); // Add green class if matched
+    parsedContent = parsedContent.replace(
+      /<a href="(https:\/\/(www|m)\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]+))"[^>]*>.*?<\/a>/g,
+      (match, url, subdomain, videoId) => {
+        if (url.includes("youtube.com/shorts")) {
+          return match;
         }
-      });
-    }
+        return `
+          <a href="${url}" target="_blank" rel="nofollow noopener noreferrer">${url}</a>
+          <iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}"
+            frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+          </iframe>`;
+      }
+    );
 
-    function parseContent(content) {
-      if (!content) return '';
-      let parsedContent = content;
-
-      parsedContent = parsedContent.replace(/#([a-zA-Z0-9_]+)/g, (match, tag) => {
-        return `<a href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?text=${tag}&number=4000" target="_blank">${match}</a>`;
-      });
-
-      parsedContent = parsedContent.replace(/:([a-zA-Z0-9_]+):/g, (match, emoji) => {
-        const emojiUrl = `https://alceawis.com/z_files/emojis/${emoji}.gif`;
-        return `<img src="${emojiUrl}" alt="${emoji}" class="emoji" />`;
-      });
-
-      parsedContent = parsedContent.replace(/<a href="(https:\/\/[^\s]+?\.(png|jpeg|jpg|gif))"[^>]*>/g, (match, imgUrl) => {
-        return `<img src="${imgUrl}" style="max-width: 50%;" />`;
-      });
-
-parsedContent = parsedContent.replace(
-  /<a href="(https:\/\/(www|m)\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]+))"[^>]*>.*?<\/a>/g,
-  (match, url, subdomain, videoId) => {
-    if (url.includes("youtube.com/shorts")) {
-      // Optional: handle shorts differently or skip
-      return match;  // return original link without iframe
-    }
-    return `
-      <a href="${url}" target="_blank" rel="nofollow noopener noreferrer">${url}</a>
-      <iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}"
-        frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
-      </iframe>`;
+    return parsedContent;
   }
-);
 
-
-      return parsedContent;
+  function normalizeUrl(url) {
+  if (url == null) {
+    console.error("[normalizeUrl] Received null or undefined:", url);
+    return "";
+  }
+  try {
+    return new URL(url).toString().replace(/\/+$/, ''); // remove trailing slashes
+  } catch {
+    if (typeof url === "string") {
+      return url.trim();
+    } else {
+      console.error("[normalizeUrl] Non-string value:", url);
+      return "";
     }
+  }
+}
 
-    function normalizeUrl(url) {
-      try {
-        return new URL(url).toString().replace(/\/+$/, ''); // remove trailing slashes
-      } catch {
-        return url.trim();
-      }
+
+  function getHandle(actorUrl) {
+    try {
+      const url = new URL(actorUrl);
+      const username = url.pathname.split('/').pop();
+      return `@${username}@${url.hostname}`;
+    } catch {
+      return actorUrl;
     }
+  }
 
-    function getHandle(actorUrl) {
-      try {
-        const url = new URL(actorUrl);
-        const username = url.pathname.split('/').pop();
-        return `@${username}@${url.hostname}`;
-      } catch {
-        return actorUrl;
-      }
-    }
-
-    fetchTimelineAndInteractions();
-  </script>
-</body>
-</html>
-
-
+  fetchTimelineAndInteractions();
+</script>
