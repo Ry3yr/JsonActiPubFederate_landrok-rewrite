@@ -101,6 +101,8 @@ setInterval(() => {
 }, 30000);
 </script>
 
+
+
 <?php
 $remoteUrl = 'https://alceawis.de/other/extra/scripts/fakesocialmedia/data_part_alcea.json';
 $localFile = 'data_alcea.json';
@@ -130,11 +132,23 @@ function convertDataToCompareFormat(array $data): array {
     }, $data);
 }
 
+function removeTimeKeyRecursive($array) {
+    foreach ($array as $key => &$value) {
+        if (is_array($value)) {
+            $value = removeTimeKeyRecursive($value);
+        }
+    }
+    unset($array['time']);
+    return $array;
+}
+
 function entryExists(array $entry, array $local): bool {
-    $needle = json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $needle = removeTimeKeyRecursive($entry);
+    $needleJson = json_encode($needle, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     foreach ($local as $item) {
-        $haystack = json_encode($item, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($needle === $haystack) return true;
+        $haystack = removeTimeKeyRecursive($item);
+        $haystackJson = json_encode($haystack, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($needleJson === $haystackJson) return true;
     }
     return false;
 }
@@ -180,7 +194,16 @@ foreach ($remoteRaw as $entry) {
 // Confirm save
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
     if (count($newRemoteEntries) > 0) {
-        $newConverted = array_map(fn($e) => $e['to_append'], $newRemoteEntries);
+        $newConverted = array_map(function ($e) {
+            $converted = $e['to_append'];
+            foreach ($converted as $dateKey => &$payload) {
+                if (is_array($payload)) {
+                    $payload['time'] = $e['time'];
+                }
+            }
+            return $converted;
+        }, $newRemoteEntries);
+
         $newData = array_merge($newConverted, $localRaw);
 
         $written = file_put_contents(
