@@ -139,6 +139,10 @@ function sendCreateActivity(array $object) {
 
     $activity = [
         '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id'           => "$baseUrl/$username",
+        'discoverable'  => true,  // Update the discoverable field
+        'locked'        => false,
+        'bot'           => false,
         'id' => $object['id'] . '/activity',
         'type' => 'Create',
         'actor' => "$baseUrl/$username",
@@ -204,6 +208,10 @@ function updateProfile() {
         'id' => "$baseUrl/$username",
         'type' => 'Person',
         'name' => 'Alcea Bot',
+        'discoverable'  => true,  // Update the discoverable field
+        'locked'        => false,
+        'bot'           => false,
+        // Add any other fields you need to update
         'preferredUsername' => $username,
         'summary' => formatDescriptionLinks($description),
         'icon' => [
@@ -218,9 +226,10 @@ function updateProfile() {
             'id' => "$baseUrl/$username#main-key",
             'owner' => "$baseUrl/$username",
             'publicKeyPem' => @file_get_contents(__DIR__ . '/public.pem'),
+'publicKeyPem' => @file_get_contents(__DIR__ . '/public.pem'),
         ],
-        // Mastodon-style profile fields here:
         'fields' => $fields,
+        'discoverability' => 'public', // <-- Here is the key for discoverability
     ];
 
     $followers = [];
