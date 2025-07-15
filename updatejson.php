@@ -18,10 +18,6 @@ function checkForSymbol() {
 }
 document.addEventListener('DOMContentLoaded', checkForSymbol);
 </script>
-
-
-
-
 <?php
 session_set_cookie_params(['secure' => true, 'httponly' => true, 'samesite' => 'Strict']);
 session_start();
@@ -160,6 +156,7 @@ $localForCompare = array_map('convertDataToCompareFormat', $localRaw);
 
 // Find new entries
 $newRemoteEntries = [];
+$current_time = date('YmdHis'); // Current timestamp in the format YmdHis
 
 foreach ($remoteRaw as $entry) {
     foreach ($entry as $payload) {
@@ -171,7 +168,8 @@ foreach ($remoteRaw as $entry) {
             if (!entryExists(convertDataToCompareFormat($converted), $localForCompare)) {
                 $newRemoteEntries[] = [
                     'original' => $original,
-                    'to_append' => $converted
+                    'to_append' => $converted,
+                    'time' => $current_time  // Add the 'time' key with the timestamp
                 ];
             }
             break;
@@ -227,7 +225,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
             </div>
             <div>
                 <h2>JSON to be Appended</h2>
-                <pre><?php echo htmlspecialchars(json_encode($entryPair['to_append'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?></pre>
+                <pre>
+                    <?php 
+                    $to_append_with_time = $entryPair['to_append'];
+                    $to_append_with_time['time'] = $entryPair['time'];  // Add the time to the "to_append" JSON
+                    echo htmlspecialchars(json_encode($to_append_with_time, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); 
+                    ?>
+                </pre>
             </div>
         </div>
     <?php endforeach; ?>
@@ -241,3 +245,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
 
 </body>
 </html>
+
