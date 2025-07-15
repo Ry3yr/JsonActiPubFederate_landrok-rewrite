@@ -80,14 +80,41 @@ function sendSignedRequest($inboxUrl, $body) {
     $signatureStr  = "(request-target): post {$p['path']}\nhost: {$p['host']}\ndate: $date\ndigest: $digest";
     openssl_sign($signatureStr, $sig, $privateKeyPem, OPENSSL_ALGO_SHA256);
     $sigHeader = 'keyId="' . $keyId . '",algorithm="rsa-sha256",headers="(request-target) host date digest",signature="' . base64_encode($sig) . '"';
-    $hdrs = ["Host: {$p['host']}","Date: $date","Digest: $digest","Signature: $sigHeader","Content-Type: application/activity+json"];
+    
+    $hdrs = [
+        "Host: {$p['host']}",
+        "Date: $date",
+        "Digest: $digest",
+        "Signature: $sigHeader",
+        "Content-Type: application/activity+json"
+    ];
+    
+    // Debugging: Log the headers and request body
+    file_put_contents(__DIR__ . '/debug.log', "[" . date('c') . "] Sending request to: $inboxUrl\n", FILE_APPEND);
+    file_put_contents(__DIR__ . '/debug.log', "[" . date('c') . "] Headers:\n" . implode("\n", $hdrs) . "\n", FILE_APPEND);
+    file_put_contents(__DIR__ . '/debug.log', "[" . date('c') . "] Body:\n$bodyJson\n\n", FILE_APPEND);
+    
     $ch = curl_init($inboxUrl);
-    curl_setopt_array($ch, [CURLOPT_POST => true,CURLOPT_POSTFIELDS => $bodyJson,CURLOPT_HTTPHEADER => $hdrs,CURLOPT_RETURNTRANSFER => true]);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $bodyJson,
+        CURLOPT_HTTPHEADER => $hdrs,
+        CURLOPT_RETURNTRANSFER => true
+    ]);
+    
     $resp = curl_exec($ch);
-    if (curl_errno($ch)) file_put_contents(__DIR__ . '/inbox.log', "[" . date('c') . "] cURL error: " . curl_error($ch) . "\n", FILE_APPEND);
+    
+    // Debugging: Log the response
+    if (curl_errno($ch)) {
+        file_put_contents(__DIR__ . '/inbox.log', "[" . date('c') . "] cURL error: " . curl_error($ch) . "\n", FILE_APPEND);
+    } else {
+        file_put_contents(__DIR__ . '/debug.log', "[" . date('c') . "] Response: $resp\n\n", FILE_APPEND);
+    }
+    
     curl_close($ch);
     return $resp;
 }
+
 function sendCreateActivity(array $note) {
     global $baseUrl, $username;
     $activity = [
@@ -131,6 +158,10 @@ foreach ($data as $entry) {
             'content'      => $htmlText,
             'contentMap'   => ['und' => $text,'html' => $htmlText],
             'tag'          => $tags,
+            'locked'        => false,
+            'bot'           => false,
+            'discoverable'  => true,
+            'group'         => false,
         ];
         $outboxItems[] = $note;
 
@@ -161,6 +192,10 @@ if ($uri === "/$username" || $uri === "/$username/") {
         'outbox'            => "$baseUrl/$username/outbox",
         'followers'         => "$baseUrl/$username/followers",
         'publicKey'         => ['id'=>"$baseUrl/$username#main-key",'owner'=>"$baseUrl/$username",'publicKeyPem'=>file_get_contents(__DIR__ . '/public.pem')],
+        'locked'        => false,
+        'bot'           => false,
+        'discoverable'  => true,
+        'group'         => false,
     ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     exit;
 }
