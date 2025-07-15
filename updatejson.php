@@ -132,21 +132,23 @@ function convertDataToCompareFormat(array $data): array {
     }, $data);
 }
 
-function removeTimeKeyRecursive($array) {
-    foreach ($array as $key => &$value) {
-        if (is_array($value)) {
-            $value = removeTimeKeyRecursive($value);
+// ✅ NEW: Strip all non-message keys (keep only 'value')
+function stripNonMessageKeys($array) {
+    $result = [];
+    foreach ($array as $dateKey => $payload) {
+        if (is_array($payload) && isset($payload['value'])) {
+            $result[$dateKey] = ['value' => $payload['value']];
         }
     }
-    unset($array['time']);
-    return $array;
+    return $result;
 }
 
 function entryExists(array $entry, array $local): bool {
-    $needle = removeTimeKeyRecursive($entry);
+    $needle = stripNonMessageKeys($entry);
     $needleJson = json_encode($needle, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
     foreach ($local as $item) {
-        $haystack = removeTimeKeyRecursive($item);
+        $haystack = stripNonMessageKeys($item);
         $haystackJson = json_encode($haystack, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($needleJson === $haystackJson) return true;
     }
@@ -197,8 +199,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
         $newConverted = array_map(function ($e) {
             $converted = $e['to_append'];
             foreach ($converted as $dateKey => &$payload) {
-                if (is_array($payload)) {
+                if (is_array($payload) && isset($payload['value'])) {
                     $payload['time'] = $e['time'];
+                    $hash = substr(md5($payload['value']), 0, 8);
+                    $payload['status'] = "{$dateKey}-$hash";
                 }
             }
             return $converted;
@@ -249,11 +253,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
             <div>
                 <h2>JSON to be Appended</h2>
                 <pre>
-                    <?php 
-                    $to_append_with_time = $entryPair['to_append'];
-                    $to_append_with_time['time'] = $entryPair['time'];  // Add the time to the "to_append" JSON
-                    echo htmlspecialchars(json_encode($to_append_with_time, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); 
-                    ?>
+<?php 
+$to_append_with_time = $entryPair['to_append'];
+$to_append_with_time['time'] = $entryPair['time'];
+echo htmlspecialchars(json_encode($to_append_with_time, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); 
+?>
                 </pre>
             </div>
         </div>
@@ -268,4 +272,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm'])) {
 
 </body>
 </html>
-
