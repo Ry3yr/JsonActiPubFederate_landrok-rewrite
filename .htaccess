@@ -7,13 +7,34 @@ RewriteEngine On
     Header set Access-Control-Allow-Headers "Content-Type, Authorization"
 </IfModule>
 
-# Match /alceawis/status/* URLs
+
+#user/status/ -to just- /status
+#RewriteCond %{HTTP_REFERER} !^https?://(www\.)?alceawis\.com/ [NC]
+#RewriteRule ^alceawis/([0-9]{8}-[a-f0-9]+)$ /alceawis/status/$1 [R=301,L]
+
+# Match /alceawis/status/* URLs (if you disable sexond line, remote resolve will be impossible)
 RewriteCond %{REQUEST_URI} ^/alceawis/status/.+$
 RewriteCond %{HTTP_REFERER} ^https?://(www\.)?alceawis\.com [NC]
 RewriteRule ^alceawis/status/(.+)$ /_https://alceawis.com/alceawis/status/$1 [R=301,L]
 
 # Redirect /users/username to /username dynamically
 RewriteRule ^users/([^/]+)/?$ /$1 [R=301,L]
+
+#v1 statuses endpoint
+#RewriteRule ^api/v1/statuses(.*)$ /alceawis/status$1 [R=301,L]
+
+#users
+RewriteRule ^users/([^/]+)/?$ /$1 [R=301,L]
+
+#lookup
+RewriteRule ^api/v1/accounts/lookup$ /lookup.php [L,R=301]
+
+
+
+
+#user/$user/inbox to /$user/inbox & outbox
+#RewriteRule ^users/alceawis/inbox$ /alceawis/inbox [R=301,L]
+#RewriteRule ^users/alceawis/outbox$ /alceawis/outbox [R=301,L]
 
 # Redirect /@username to /username (optional, but common)
 RewriteRule ^@([^/]+)$ /$1 [R=302,L]
