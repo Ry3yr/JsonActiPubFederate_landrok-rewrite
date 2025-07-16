@@ -136,6 +136,14 @@ foreach ($data as $entry) {
     foreach ($entry as $date => $content) {
         $hash      = substr(md5($content['value']), 0, 8);
         $text      = formatEmojis($content['value']);
+
+        // 💬 inReplyTo detection
+        $inReplyTo = null;
+        if (preg_match('/💬\s*(https?:\/\/[^\s💬]+)\s*💬/', $text, $match)) {
+            $inReplyTo = trim($match[1]);
+            $text = trim(str_replace($match[0], '', $text)); // optionally remove 💬URL💬 from post
+        }
+
         $hashtags  = array_filter(array_map('trim', explode(',', $content['hashtags'] ?? '')));
         $quoted    = formatQuotes($text);
         $htmlText  = preg_replace('~(https?://[^\s<]+)~i', '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>', $quoted);
@@ -145,12 +153,14 @@ foreach ($data as $entry) {
         $tags = array_map(fn($tag) => ['type'=>'Hashtag','name'=>"#$tag",'href'=>"https://$GLOBALS[domain]/tags/$tag"], $hashtags);
 
         preg_match_all('/:([a-zA-Z0-9_]+):/', $content['value'], $emo);
-        foreach ($emo[1] as $sc) $tags[] = ['type'=>'Emoji','name'=>":$sc:",'icon'=>['type'=>'Image','mediaType'=>'image/gif','url'=>"https://$GLOBALS[domain]/z_files/emojis/$sc.gif"]];
+        foreach ($emo[1] as $sc)
+            $tags[] = ['type'=>'Emoji','name'=>":$sc:",'icon'=>['type'=>'Image','mediaType'=>'image/gif','url'=>"https://$GLOBALS[domain]/z_files/emojis/$sc.gif"]];
 
         $noteId = "$baseUrl/$username/status/{$date}-$hash";
-        $note   = [
+
+        $note = [
             'id'           => $noteId,
-            'url'          => $noteId, //added to maybe improve outbox
+            'url'          => $noteId,
             'type'         => 'Note',
             'published'    => date(DATE_ATOM, strtotime($date)),
             'attributedTo' => "$baseUrl/$username",
@@ -158,11 +168,17 @@ foreach ($data as $entry) {
             'content'      => $htmlText,
             'contentMap'   => ['und' => $text,'html' => $htmlText],
             'tag'          => $tags,
-            'locked'        => false,
-            'bot'           => false,
-            'discoverable'  => true,
-            'group'         => false,
+            'locked'       => false,
+            'bot'          => false,
+            'discoverable' => true,
+            'group'        => false,
+            'manuallyApprovesFollowers' => false,
         ];
+
+        if ($inReplyTo) {
+            $note['inReplyTo'] = $inReplyTo;
+        }
+
         $outboxItems[] = $note;
 
         if (!in_array($noteId, $pushed)) {
@@ -196,6 +212,7 @@ if ($uri === "/$username" || $uri === "/$username/") {
         'bot'           => false,
         'discoverable'  => true,
         'group'         => false,
+        'manuallyApprovesFollowers'         => false,
     ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     exit;
 }
