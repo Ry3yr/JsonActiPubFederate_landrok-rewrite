@@ -57,8 +57,11 @@ $(document).ready(function () {
         <hr>
           <div id="followerCount"></div><script>fetch('https://alceawis.com/alceawis/followers').then(res => res.json()).then(data => document.getElementById('followerCount').innerHTML = `<a href="https://alceawis.com/reportfollowers.php#https://alceawis.com/alceawis/followers" target="_blank" style="color:pink;">Followers: ${data.orderedItems.length}</a>`).catch(err => console.error('Error:', err));</script>
         <div id="postCount"></div><script>fetch('https://alceawis.com/alceawis/outbox').then(res => res.json()).then(data => document.getElementById('postCount').innerHTML = `<a href="#" target="_blank" style="color:pink;">Posts: ${data.totalItems}</a>`).catch(err => console.error('Error:', err));</script>
+        <form id="lookup-form"><input type="text" id="domain" name="domain" placeholder="Enter domain" value="mas.to"><br><input type="text" id="user" name="user" placeholder="Enter username" value="@alceawis@alceawis.com"><button type="button" onclick="openLookup()">Go</button></form><script>function openLookup() {const domain = document.getElementById('domain').value.trim();const user = document.getElementById('user').value.trim();if (domain && user) {const url = `https://${domain}/api/v1/accounts/lookup?acct=${user}`;window.open(url, '_blank');} else {alert("Please fill out both fields.");}}</script>
+
         <!--<a target="_blank" href="#" style="display: block; margin: 5px; color: #D5006D; text-decoration: none;">-</a>-->
         <hr>
+               <a target="_blank" href="https://app.pulsetic.com/status/bVlNm1Cj/?preview=true#https://stats.uptimerobot.com/6wi9pgxFJ5" style=color:#D5006D>Status</a>
                <a target="_blank" href="https://mastodon.social/@alcea" style="display: block; margin: 5px; color: #D5006D; text-decoration: none;">@alcea@mastodon.social</a>
     </div>
 </div>
@@ -305,51 +308,103 @@ $(document).ready(function () {
   });
 
   function displayTimeline(posts, interactions) {
-    const timelineContainer = document.getElementById("timeline");
+  const timelineContainer = document.getElementById("timeline");
 
-    posts.forEach(post => {
-      const content = parseContent(post.content);
-      const postId = post.id;
+  posts.forEach((post, index) => {
+    const content = parseContent(post.content);
+    const postId = post.id;
 
-      const likes = interactions.filter(i => i.type === "Like" && i.object === postId);
-      const rewts = interactions.filter(i => i.type === "Announce" && i.object === postId);
-      const repliesHtml = collectReplies(postId, interactions);
+    const likes = interactions.filter(i => i.type === "Like" && i.object === postId);
+    const rewts = interactions.filter(i => i.type === "Announce" && i.object === postId);
+    const repliesHtml = collectReplies(postId, interactions);
 
-      const likesHtml = likes.length
-        ? `<strong>Likes:</strong> ${likes.map(like =>
-            `❤️ <a href="${like.actor}" target="_blank">${getHandle(like.actor)}</a>`
-          ).join(", ")}`
-        : "";
+    const likesHtml = likes.length
+      ? `<strong>Likes:</strong> ${likes.map(like =>
+          `❤️ <a href="${like.actor}" target="_blank">${getHandle(like.actor)}</a>`
+        ).join(", ")}`
+      : "";
 
-      const rewtsHtml = rewts.length
-        ? `<strong>Rewts:</strong> ${rewts.map(r =>
-            `🔁 <a href="${r.actor}" target="_blank">${getHandle(r.actor)}</a>`
-          ).join(", ")}`
-        : "";
+    const rewtsHtml = rewts.length
+      ? `<strong>Rewts:</strong> ${rewts.map(r =>
+          `🔁 <a href="${r.actor}" target="_blank">${getHandle(r.actor)}</a>`
+        ).join(", ")}`
+      : "";
 
-      const interactionSection = (likesHtml || rewtsHtml || repliesHtml)
-        ? `<div class="interactions">
-            ${likesHtml}
-            ${rewtsHtml}
-            ${repliesHtml}
-          </div>`
-        : "";
+    const interactionSection = (likesHtml || rewtsHtml || repliesHtml)
+      ? `<div class="interactions">
+          ${likesHtml}
+          ${rewtsHtml}
+          ${repliesHtml}
+        </div>`
+      : "";
 
-      const postElement = document.createElement("div");
-      postElement.classList.add("post");
-      postElement.innerHTML = `
-        <strong>@<a href="${post.attributedTo}" target="_blank">alceawis</a></strong><br>
-        <em>Published: ${new Date(post.published).toLocaleString()}</em><br>
-        <div class="content">${content}</div>
-        <a href="${post.id}" target="_blank">[link]</a>
-        ${interactionSection}
-      `;
+    // Create the post element (same as your original code)
+    const postElement = document.createElement("div");
+    postElement.classList.add("post");
+    postElement.innerHTML = `
+      <strong>@<a href="${post.attributedTo}" target="_blank">alceawis</a></strong><br>
+      <em>Published: ${new Date(post.published).toLocaleString()}</em><br>
+      <div class="content">${content}</div>
+      <a href="${post.id}" target="_blank">[link]</a>
+      ${interactionSection}
+    `;
 
-      timelineContainer.appendChild(postElement);
-    });
+    // Only modify the first post to add the found link
+    if (index === 0) {
+      const statusUrl = `https://alceawis.com/statusurl.php?url=${encodeURIComponent(post.id)}`;
 
-    compareLinksToPushed();
-  }
+      // Set up a timeout for the fetch request
+      const timeout = 5000; // Timeout after 5 seconds
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      fetch(statusUrl, { signal: controller.signal })
+        .then(response => response.text())
+        .then(data => {
+          clearTimeout(timeoutId); // Clear the timeout once we get a response
+
+          const foundLink = document.createElement("a");
+          foundLink.target = "_blank";
+
+          // Check if the PHP response contains a valid ID
+          if (data.includes("No post found") || data.includes("No matching post")) {
+            foundLink.textContent = "[Not Found]";
+            foundLink.style.color = "red";
+            foundLink.href = statusUrl; // Link back to the status URL
+          } else {
+            const foundId = data.trim(); // The ID returned by PHP
+            foundLink.textContent = "[Found]";
+            foundLink.style.color = "green";
+            foundLink.href = `https://mas.to/web/statuses/${foundId}`; // Direct link to mas.to/status
+          }
+
+          // Append the status link right next to the post link
+          const postLink = postElement.querySelector("a[href='" + post.id + "']");
+          postLink.insertAdjacentElement("afterend", foundLink);
+        })
+        .catch(error => {
+          clearTimeout(timeoutId); // Clear the timeout in case of failure
+
+          const foundLink = document.createElement("a");
+          foundLink.target = "_blank";
+          foundLink.textContent = "[Service Unavailable]";
+          foundLink.href = statusUrl;
+          foundLink.style.color = "gray"; // Indicate service error
+
+          // Append the error message next to the post link
+          const postLink = postElement.querySelector("a[href='" + post.id + "']");
+          postLink.insertAdjacentElement("afterend", foundLink);
+        });
+    }
+
+    // Append the post element to the timeline container (unchanged from original code)
+    timelineContainer.appendChild(postElement);
+  });
+
+  compareLinksToPushed();
+}
+
 
   function collectReplies(postId, interactions, depth = 0) {
     const replies = interactions.filter(i =>
@@ -410,7 +465,7 @@ $(document).ready(function () {
     });
 
     parsedContent = parsedContent.replace(
-      /<a href="(https:\/\/(www|m)\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]+))"[^>]*>.*?<\/a>/g,
+      /<a href="(https:\/\/(www|m)\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)(?:&[^"]*)?)"[^>]*>.*?<\/a>/g,
       (match, url, subdomain, videoId) => {
         if (url.includes("youtube.com/shorts")) {
           return match;
