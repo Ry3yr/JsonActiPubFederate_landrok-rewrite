@@ -133,12 +133,18 @@ function sendCreateActivity(array $note) {
 
 /* ---------- build outbox ---------- */
 
+
+$lastNoteId = null;
+
 foreach ($data as $entry) {
     foreach ($entry as $date => $content) {
         $hash = substr(md5($content['value']), 0, 8);
         $text = formatEmojis($content['value']);
 
         $inReplyTo = null;
+        $mentionTag = null;
+        $mentionAcct = null;
+
         if (preg_match('/💬(https?:\/\/[^\s💬]+)💬/', $text, $match)) {
             $inReplyTo = $match[1];
             $lines = explode("\n", $text);
@@ -146,21 +152,47 @@ foreach ($data as $entry) {
             $text = implode("\n", $lines);
         }
 
+        // Extract hashtags
         $hashtags = array_filter(array_map('trim', explode(',', $content['hashtags'] ?? '')));
-        //$escapedText = htmlspecialchars($text);
-        //$quotedText = formatQuotes($escapedText);
+
+        // Handle @mention if replying to someone
+        if ($inReplyTo && preg_match('~https?://([^/]+)/@([a-zA-Z0-9_]+)~', $inReplyTo, $matches)) {
+            $mentionDomain = $matches[1];
+            $mentionUser = $matches[2];
+            $mentionAcct = "$mentionUser@$mentionDomain";
+            $mentionUrl = "https://$mentionDomain/@$mentionUser";
+            $mentionText = "@$mentionAcct ";
+
+            if (strpos($text, $mentionText) !== 0) {
+                $text = $mentionText . $text;
+            }
+
+            // Create Mention tag object
+            $mentionTag = [
+                'type' => 'Mention',
+                'href' => $mentionUrl,
+                'name' => "@$mentionAcct"
+            ];
+        }
+
+        // Format quotes and links
         $quotedText = formatQuotes($text);
         $htmlText = preg_replace(
             '~(https?://[^\s<]+)~i',
             '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>',
             $quotedText
         );
+
+        // Convert hashtags to tag links
         $htmlText = preg_replace_callback('/#([\w-]+)/', function($matches) use ($domain) {
             $tag = $matches[1];
             $url = "https://$domain/tags/" . urlencode($tag);
             return "<a href=\"$url\" rel=\"tag nofollow noopener noreferrer\">#" . htmlspecialchars($tag) . "</a>";
         }, $htmlText);
+
         $htmlText = nl2br($htmlText);
+
+        // Build hashtag tag objects
         $tags = array_map(function($tag) use ($domain) {
             return [
                 'type' => 'Hashtag',
@@ -169,10 +201,10 @@ foreach ($data as $entry) {
             ];
         }, $hashtags);
 
+        // Extract emoji shortcodes and create tag objects
         preg_match_all('/:([a-zA-Z0-9_]+):/', $content['value'], $emojiMatches);
-        $emojiTags = [];
         foreach ($emojiMatches[1] as $shortcode) {
-            $emojiTags[] = [
+            $tags[] = [
                 'type' => 'Emoji',
                 'name' => ":$shortcode:",
                 'icon' => [
@@ -183,10 +215,15 @@ foreach ($data as $entry) {
             ];
         }
 
-        $tags = array_merge($tags, $emojiTags);
+        // Add mention tag if applicable
+        if ($mentionTag) {
+            $tags[] = $mentionTag;
+        }
 
+        // Compose Note ID
         $noteId = "$baseUrl/$username/status/{$date}-$hash";
 
+        // Build the Note object
         $note = [
             'id' => $noteId,
             'type' => 'Note',
@@ -201,16 +238,45 @@ foreach ($data as $entry) {
             'tag' => $tags,
         ];
 
+        // Add inReplyTo if exists
         if ($inReplyTo) {
             $note['inReplyTo'] = $inReplyTo;
         }
 
         $outboxItems[] = $note;
 
+        // Send activity only if not already pushed
         if (!in_array($noteId, $pushed)) {
             sendCreateActivity($note);
             $pushed[] = $noteId;
             file_put_contents($pushedFile, json_encode($pushed, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
+    }
+}
+
+// Log last pushed note
+if (!empty($pushed)) {
+    $lastPushedUrl = end($pushed);
+
+    foreach ($outboxItems as $item) {
+        if ($item['id'] === $lastPushedUrl) {
+            $noteText = $item['contentMap']['und'] ?? '[No text]';
+            $inReplyTo = $item['inReplyTo'] ?? 'None';
+
+            if (!file_exists('outbox.log')) {
+                file_put_contents('outbox.log', '');
+            }
+
+            $logEntry = sprintf(
+                "[%s] New post created\nStatus URL: %s\nReply To: %s\nContent:\n%s\n\n",
+                date('Y-m-d H:i:s'),
+                $lastPushedUrl,
+                $inReplyTo,
+                $noteText
+            );
+
+            //file_put_contents('outbox.log', $logEntry, FILE_APPEND | LOCK_EX);
+            break;
         }
     }
 }
