@@ -47,10 +47,10 @@ $outboxItems    = [];
 
 /* ---------- helpers ---------- */
 function formatEmojis($text) {
-    return $text;                 // keep shortcode as‑is
+    return $text;                 // keep shortcode asâ€‘is
 }
 function formatQuotes($text) {
-    return preg_replace_callback('/ð’«(.*?)ð’«/s', function ($m) {
+    return preg_replace_callback('/Ã°â€™ÂÂ«(.*?)Ã°â€™ÂÂ«/s', function ($m) {
         return "<blockquote>" . trim($m[1]) . "</blockquote>";
     }, $text);
 }
@@ -132,47 +132,73 @@ function sendCreateActivity(array $note) {
 }
 
 /* ---------- build outbox ---------- */
+
 foreach ($data as $entry) {
     foreach ($entry as $date => $content) {
-        $hash      = substr(md5($content['value']), 0, 8);
-        $text      = formatEmojis($content['value']);
+        $hash = substr(md5($content['value']), 0, 8);
+        $text = formatEmojis($content['value']);
 
-        // 💬 inReplyTo detection
         $inReplyTo = null;
-        if (preg_match('/💬\s*(https?:\/\/[^\s💬]+)\s*💬/', $text, $match)) {
-            $inReplyTo = trim($match[1]);
-            $text = trim(str_replace($match[0], '', $text)); // optionally remove 💬URL💬 from post
+        if (preg_match('/💬(https?:\/\/[^\s💬]+)💬/', $text, $match)) {
+            $inReplyTo = $match[1];
+            $lines = explode("\n", $text);
+            array_shift($lines);
+            $text = implode("\n", $lines);
         }
 
-        $hashtags  = array_filter(array_map('trim', explode(',', $content['hashtags'] ?? '')));
-        $quoted    = formatQuotes($text);
-        $htmlText  = preg_replace('~(https?://[^\s<]+)~i', '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>', $quoted);
-        $htmlText  = preg_replace_callback('/#([\w-]+)/', fn($m) => "<a href=\"https://$GLOBALS[domain]/tags/" . urlencode($m[1]) . "\" rel=\"tag nofollow noopener noreferrer\">#" . htmlspecialchars($m[1]) . "</a>", $htmlText);
-        $htmlText  = nl2br($htmlText);
+        $hashtags = array_filter(array_map('trim', explode(',', $content['hashtags'] ?? '')));
+        //$escapedText = htmlspecialchars($text);
+        //$quotedText = formatQuotes($escapedText);
+        $quotedText = formatQuotes($text);
+        $htmlText = preg_replace(
+            '~(https?://[^\s<]+)~i',
+            '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>',
+            $quotedText
+        );
+        $htmlText = preg_replace_callback('/#([\w-]+)/', function($matches) use ($domain) {
+            $tag = $matches[1];
+            $url = "https://$domain/tags/" . urlencode($tag);
+            return "<a href=\"$url\" rel=\"tag nofollow noopener noreferrer\">#" . htmlspecialchars($tag) . "</a>";
+        }, $htmlText);
+        $htmlText = nl2br($htmlText);
+        $tags = array_map(function($tag) use ($domain) {
+            return [
+                'type' => 'Hashtag',
+                'name' => "#$tag",
+                'href' => "https://$domain/tags/$tag"
+            ];
+        }, $hashtags);
 
-        $tags = array_map(fn($tag) => ['type'=>'Hashtag','name'=>"#$tag",'href'=>"https://$GLOBALS[domain]/tags/$tag"], $hashtags);
+        preg_match_all('/:([a-zA-Z0-9_]+):/', $content['value'], $emojiMatches);
+        $emojiTags = [];
+        foreach ($emojiMatches[1] as $shortcode) {
+            $emojiTags[] = [
+                'type' => 'Emoji',
+                'name' => ":$shortcode:",
+                'icon' => [
+                    'type' => 'Image',
+                    'mediaType' => 'image/gif',
+                    'url' => "https://$domain/z_files/emojis/$shortcode.gif"
+                ]
+            ];
+        }
 
-        preg_match_all('/:([a-zA-Z0-9_]+):/', $content['value'], $emo);
-        foreach ($emo[1] as $sc)
-            $tags[] = ['type'=>'Emoji','name'=>":$sc:",'icon'=>['type'=>'Image','mediaType'=>'image/gif','url'=>"https://$GLOBALS[domain]/z_files/emojis/$sc.gif"]];
+        $tags = array_merge($tags, $emojiTags);
 
         $noteId = "$baseUrl/$username/status/{$date}-$hash";
 
         $note = [
-            'id'           => $noteId,
-            'url'          => $noteId,
-            'type'         => 'Note',
-            'published'    => date(DATE_ATOM, strtotime($date)),
+            'id' => $noteId,
+            'type' => 'Note',
+            'published' => date(DATE_ATOM, strtotime($date)),
             'attributedTo' => "$baseUrl/$username",
-            'to'           => ['https://www.w3.org/ns/activitystreams#Public'],
-            'content'      => $htmlText,
-            'contentMap'   => ['und' => $text,'html' => $htmlText],
-            'tag'          => $tags,
-            'locked'       => false,
-            'bot'          => false,
-            'discoverable' => true,
-            'group'        => false,
-            'manuallyApprovesFollowers' => false,
+            'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+            'content' => $htmlText,
+            'contentMap' => [
+                'und' => $text,
+                'html' => $htmlText,
+            ],
+            'tag' => $tags,
         ];
 
         if ($inReplyTo) {
@@ -184,10 +210,11 @@ foreach ($data as $entry) {
         if (!in_array($noteId, $pushed)) {
             sendCreateActivity($note);
             $pushed[] = $noteId;
+            file_put_contents($pushedFile, json_encode($pushed, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         }
     }
 }
-file_put_contents($pushedFile, json_encode($pushed, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
 
 /* ---------- router ---------- */
 $uri = explode('?', $_SERVER['REQUEST_URI'] ?? '')[0];
@@ -195,7 +222,7 @@ $uri = explode('?', $_SERVER['REQUEST_URI'] ?? '')[0];
 if ($uri === "/$username" || $uri === "/$username/") {
     header('Content-Type: application/activity+json');
     header('Vary: Accept');
-    $descHtml = formatDescriptionLinks("This is **Alcea's** semi‑automated profile! It fetches from a local timeline at https://alceawis.com");
+    $descHtml = formatDescriptionLinks("This is **Alcea's** semiâ€‘automated profile! It fetches from a local timeline at https://alceawis.com");
     echo json_encode([
         '@context'          => ['https://www.w3.org/ns/activitystreams',['manuallyApprovesFollowers'=>'as:manuallyApprovesFollowers','toot'=>'http://joinmastodon.org/ns#','featured'=>['@id'=>'toot:featured','@type'=>'@id']]],
         'id'                => "$baseUrl/$username",
@@ -259,7 +286,26 @@ if (preg_match('/^\/' . $username . '\/status\/([a-z0-9\-]+)$/', $uri, $m)) {
         'to'            => ['https://www.w3.org/ns/activitystreams#Public'],
         'content'       => $html,
         'contentMap'    => ['und'=>$post['value'],'html'=>$html],
-        'tag'           => array_map(fn($t)=>['type'=>'Hashtag','name'=>"#$t",'href'=>"https://$domain/tags/$t"], explode(',',$post['hashtags']??'')),
+ 'tag' => array_merge(
+    array_map(fn($t) => [
+        'type' => 'Hashtag',
+        'name' => "#$t",
+        'href' => "https://$domain/tags/$t"
+    ], array_filter(array_map('trim', explode(',', $post['hashtags'] ?? '')))),
+    (function() use ($post, $domain) {
+        preg_match_all('/:([a-zA-Z0-9_]+):/', $post['value'], $matches);
+        return array_map(fn($sc) => [
+            'type' => 'Emoji',
+            'name' => ":$sc:",
+            'icon' => [
+                'type' => 'Image',
+                'mediaType' => 'image/gif',
+                'url' => "https://$domain/z_files/emojis/$sc.gif"
+            ]
+        ], $matches[1]);
+    })()
+)
+
     ];
     header('Content-Type: application/activity+json');
     echo json_encode($note, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
