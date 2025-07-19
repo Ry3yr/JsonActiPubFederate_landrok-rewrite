@@ -1,30 +1,6 @@
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-$(document).ready(function () {
-  const domain = window.location.hostname;
-  const federatedHandle = `${domain.split('.')[0]}@${domain}`;
-  const searchURL = `https://mastodon.social/search?q=${encodeURIComponent(federatedHandle)}&type=accounts`;
-  const checkLinkExistence = setInterval(function () {
-    const existingLink = $('a[href^="https://mastodon.social/search"]');
-   
-    if (existingLink.length > 0) {
-      clearInterval(checkLinkExistence);
-    } else {
-      const container = $('<div>').addClass('formClass');
-      const paragraph = $('<p>').text("You can follow this profile on Fediverse by typing the handle in your instance search or clicking this link:");
-      const link = $('<a>').attr('href', searchURL).attr('target', '_blank').text(federatedHandle);
-      container.append(paragraph, link);
-      $('body').prepend(container);
-      clearInterval(checkLinkExistence);
-    }
-  }, 1500);
-});
-</script><a target="_blank" href="https://mas.to/search?q=alceawis%40alceawis.com&type=accounts" style=color:pink>2</a><br>
-(Or use this <a target="_blank" href="https://mastodon.social/@alcea/114834785762248316" style=color:gray>post</a> as reference to find the profile. You can search for this url too!) <a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=40&text=Where%20%40alceawis%40alceawis." id=3936 style=color:green>Instance Compatibility</a> <a target="_blank" href="reportfollowers.php#https://alceawis.com/alceawis/followers" style=color:lightblue>Followers</a><br><hr>
 
 
-<meta charset="UTF-8"> <!--for fixing quotes-->
 <!---Twitter-esque--aesthetic-->
 <style>
     body {
@@ -102,7 +78,8 @@ $(document).ready(function () {
     }
 </style>
 
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    
 
 
 
@@ -113,23 +90,19 @@ $(document).ready(function () {
 </head>
 <body>
     <div id="errorLog"></div>
-   <div id="jsonloaded"></div>
+    <div id="jsonloaded"></div>
     <!--Search-->
-    <!--<form action="/other/extra/scripts/fakesocialmedia/commentload.html" method="get" target="_blank">
+    <form action="/other/extra/scripts/fakesocialmedia/commentload.html" method="get" target="_blank">
         <input type="text" id="keyword" name="text" required>
         <input type="hidden" name="number" value="4000">
         <button type="submit">Search</button>
-    </form>-->
+    </form>
     <div id="containerfakesocialmedia"></div>
 
     <script>
     const urlParams = new URLSearchParams(window.location.search);
     const limit = urlParams.get("limit") || "15";
-    const basedUrl = window.location.origin;
-    const newPath = '/z_files/emojis';
-    const baseurl = basedUrl + newPath;
-    //const baseurl = "/z_files/emoji";
-    //const baseurl = "https://alcea-wisteria.de/z_files/emoji";
+    const baseurl = "https://alcea-wisteria.de/z_files/emoji";
     const errorLogDiv = document.getElementById('errorLog');
 
     function getQueryParam(param) {
@@ -158,9 +131,9 @@ if (url.searchParams.get("all") === "yes") {
   all = "_part";
 }
 
-const user = 'alcea';
+const user = getQueryParam('user');
 if (user) {
-    const jsonFile = `data_${user}.json?t=${Date.now()}`;
+    const jsonFile = `data_alcea.json?t=${Date.now()}`;
     console.log(jsonFile); 
     let myDiv = document.getElementById("jsonloaded");
     myDiv.textContent = jsonFile;
@@ -180,7 +153,7 @@ if (user) {
                         const dateElement = document.createElement('p');
                         dateElement.innerHTML = `<hr>Date: ${date}`;
                         const valueElement = document.createElement('p');
-                        const valueWithoutQuotes = value.replace(/𒐫[\s\S]*?𒐫/g, '');
+                        const valueWithoutQuotes = value.replace(/𒐫[\s\S]*?𒐫/g, ''); // Removes 𒐫...𒐫 block
                         valueElement.innerHTML = `<img src=https://alcea-wisteria.de/z_files/emoji/${user}.png width=100px><br>@<a target="_blank" href="/fakesocialrender_limited.html?user=${user}" style="color:pink">${user}</a>: ${replaceEmojis(valueWithoutQuotes).replace(/(https?:\/\/[^\s]+)/g, (match) => {
     if (match.includes('pixiv.net')) {
                                 const pixivRegex = /https?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/(\d+)/;
@@ -219,10 +192,41 @@ while ((match = quoteRegex.exec(value)) !== null) {
     quoteBlock.style.backgroundColor = '#f9f9f9';
     const formattedQuote = match[1].replace(/\n/g, '<br>');
     quoteBlock.innerHTML = formattedQuote.trim();
-    postElement.appendChild(quoteBlock);
+        postElement.appendChild(quoteBlock);
 }
-postElement.appendChild(hashtagsElement);
 
+
+//link2acws
+// Function to decode surrogate pairs and Unicode escapes from JSON string literal
+function decodeUnicodeEscapes(str) {
+    return str.replace(/\\u([\dA-Fa-f]{4})/g, (_, hex) =>
+        String.fromCharCode(parseInt(hex, 16))
+    );
+}
+
+if (value.includes("•acws")) {
+    // Step 1: decode the literal Unicode escapes (\ud809\udc2b) to real characters
+    const decodedValue = decodeUnicodeEscapes(value);
+    const formattedValue = decodedValue.replace(/𒐫(.*?)𒐫/g, '<blockquote>$1</blockquote>');
+
+    const dateClean = date.replace(/-/g, '');
+    const hash = CryptoJS.MD5(formattedValue).toString().substring(0, 8);
+    const permalink = `https://alceawis.com/alceawis/status/${dateClean}-${hash}`;
+
+    // Step 4: create and append link
+    const link = document.createElement('a');
+    link.href = permalink;
+    link.target = "_blank";
+    link.textContent = 'Permalink';
+    link.classList.add('btn2');
+    postElement.appendChild(link);
+}
+
+
+
+
+
+postElement.appendChild(hashtagsElement);
 
           const buttonElement = document.createElement('button');
           buttonElement.classList.add('btn');
@@ -267,7 +271,7 @@ postElement.appendChild(hashtagsElement);
         console.log('No user selected, defaulting to alcea');
         var currentUrl = window.location.href;
         var newUrl = currentUrl.split('?')[0] + '?user=alcea';
-       // window.location.href = newUrl;
+        window.location.href = newUrl;
         document.body.appendChild(element);
     }
 
@@ -284,3 +288,35 @@ postElement.appendChild(hashtagsElement);
     </script>
 </body>
 </html>
+
+
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function () {
+  const domain = window.location.hostname;
+  const federatedHandle = `${domain.split('.')[0]}@${domain}`;
+  const searchURL = `https://mastodon.social/search?q=${encodeURIComponent(federatedHandle)}&type=accounts`;
+  const checkLinkExistence = setInterval(function () {
+    const existingLink = $('a[href^="https://mastodon.social/search"]');
+  
+    if (existingLink.length > 0) {
+      clearInterval(checkLinkExistence);
+    } else {
+      const container = $('<div>').addClass('formClass');
+      const paragraph = $('<p>').text("You can follow this profile on Fediverse by typing the handle in your instance search or clicking this link:");
+      const link = $('<a>').attr('href', searchURL).attr('target', '_blank').text(federatedHandle);
+      container.append(paragraph, link);
+      $('body').prepend(container);
+      clearInterval(checkLinkExistence);
+    }
+  }, 1500);
+});
+</script><a target="_blank" href="https://mas.to/search?q=alceawis%40alceawis.com&type=accounts" style=color:pink>2</a><br>
+(Or use this <a target="_blank" href="https://mastodon.social/@alcea/114834785762248316" style=color:gray>post</a> as reference to find the profile. You can search for this url too!) <a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=40&text=Where%20%40alceawis%40alceawis." id=3936 style=color:green>Instance Compatibility</a> <a target="_blank" href="reportfollowers.php#https://alceawis.com/alceawis/followers" style=color:lightblue>Followers</a><br><hr>
+
+
+<meta charset="UTF-8"> <!--for fixing quotes-->
+<br><a href="timeline.html">View Timeline</a><br><hr>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
