@@ -345,7 +345,11 @@ $(document).ready(function () {
       <em>Published: ${new Date(post.published).toLocaleString()}</em><br>
       <div class="content">${content}</div>
     <a href="${post.id}" target="_blank">[link]</a>
-<button class="reply-btn" data-post-id="${post.id}">Reply</button>
+<button class="reply-btn" data-post-id="${post.id}" style="padding:5px 10px; cursor:pointer;background: rgba(255, 105, 180, 0.7); border: none;border-radius: 12px;color: white;font-weight: bold;transition: background 0.3s ease;"> Reply</button>
+<button class="json-btn" data-json-url="${post.id}" style="padding:5px 10px; cursor:pointer;background: rgba(255, 105, 180, 0.7); border: none;border-radius: 12px;color: white;font-weight: bold;transition: background 0.3s ease;">  Show JSON</button>
+
+
+
 
 
       ${interactionSection}
@@ -540,3 +544,104 @@ $(document).ready(function () {
     }
   });
 </script>
+
+
+<!--Show--Json-->
+<script>
+  (function() {
+    const modalHTML = `
+      <div id="jsonModal" style="
+        display:none;
+        position:fixed;
+        top:0; left:0;
+        width:100vw; height:100vh;
+        background:rgba(0,0,0,0.5);
+        justify-content:center;
+        align-items:center;
+        z-index:1000;
+      ">
+        <div style="
+          background:#fff;
+          padding:1em;
+          max-width:90%;
+          max-height:80vh;
+          overflow:auto;
+          border-radius:5px;
+          position:relative;
+          width: 90%;
+          max-width: 600px;
+        " onclick="event.stopPropagation()">
+  <button id="copyJsonBtn" style="
+  position:absolute; top:10px; right:10px;
+  padding:5px 10px; cursor:pointer;
+  background: rgba(255, 105, 180, 0.7); /* pink with 70% opacity */
+  border: none;
+  border-radius: 12px; /* rounded corners */
+  color: white;
+  font-weight: bold;
+  transition: background 0.3s ease;
+" disabled>Copy</button>
+          <pre id="jsonContent" style="
+            white-space:pre-wrap;
+            font-size:0.85em;
+            margin-top: 40px;
+            user-select: text;
+          "></pre>
+        </div>
+      </div>
+    `;
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = modalHTML;
+    document.body.appendChild(tempDiv.firstElementChild);
+    const copyBtn = document.getElementById('copyJsonBtn');
+    const content = document.getElementById('jsonContent');
+    copyBtn.addEventListener('click', () => {
+      if (copyBtn.disabled) return;
+      const textToCopy = content.textContent;
+      if (!textToCopy) return;
+      navigator.clipboard.writeText(textToCopy)
+        .then(() => {
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => copyBtn.textContent = 'Copy', 1500);
+        })
+        .catch(() => {
+          copyBtn.textContent = 'Failed to copy';
+          setTimeout(() => copyBtn.textContent = 'Copy', 1500);
+        });
+    });
+  })();
+  document.addEventListener('click', async (e) => {
+    const modal = document.getElementById('jsonModal');
+    const copyBtn = document.getElementById('copyJsonBtn');
+    const content = document.getElementById('jsonContent');
+    if (e.target === modal) {
+      modal.style.display = 'none';
+      return;
+    }
+    if (e.target.matches('.json-btn')) {
+      const url = e.target.getAttribute('data-json-url');
+      if (!url) {
+        content.textContent = '❌ Invalid JSON URL.';
+        modal.style.display = 'flex';
+        copyBtn.disabled = true;
+        return;
+      }
+      content.textContent = 'Loading...';
+      modal.style.display = 'flex';
+      copyBtn.disabled = true;
+      try {
+        const res = await fetch(url, { headers: { 'Accept': 'application/activity+json' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        content.textContent = JSON.stringify(data, null, 2);
+        copyBtn.disabled = false;
+        copyBtn.textContent = 'Copy';
+      } catch (err) {
+        content.textContent = `❌ Failed to load JSON:\n${err.message}`;
+        copyBtn.disabled = true;
+        copyBtn.textContent = 'Copy';
+      }
+    }
+  });
+</script>
+
