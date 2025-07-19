@@ -1,10 +1,22 @@
 {
     "image_url": "https://alceawis.com/z_files/emojis/alceawis.gif",
-    "description": "This is **Alcea's** funky semi\u2011automated profile! It fetches from a local timeline at https://alceawis.com",
+    "description": "This is *Alcea's* kinda maybe funky semi-automated profile! It fetches from a local timeline at https://alceawis.com",
     "links": [
-        { "name": "Website", "url": "https://alceawis.com/" },
-        { "name": "", "url": "" },
-        { "name": "", "url": "" },
-        { "name": "", "url": "" }
+        {
+            "name": "Website",
+            "url": "https://alceawis.com/"
+        },
+        {
+            "name": "",
+            "url": ""
+        },
+        {
+            "name": "",
+            "url": ""
+        },
+        {
+            "name": "",
+            "url": ""
+        }
     ]
 }

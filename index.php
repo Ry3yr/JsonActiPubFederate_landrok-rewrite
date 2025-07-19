@@ -124,7 +124,15 @@ $lastNoteId = null;
 foreach ($data as $entry) {
     foreach ($entry as $date => $content) {
         $hash = substr(md5($content['value']), 0, 8);
-        $text = formatEmojis($content['value']);
+        $normalizedContent = preg_replace('/:([a-zA-Z0-9_]+):\r?\n/', ':$1: ', $content['value']); // Normalize newlines after emoji shortcodes
+        $text = formatEmojis($normalizedContent);
+       // preg_match_all('/:([a-zA-Z0-9_]+):/', $text, $matches);
+        //$emojisFound = implode(", ", $matches[1]);
+        //error_log("Emojis found: $emojisFound\n", 3, __DIR__ . '/debug.log');
+
+        //$inline = ['rofl', 'confused_dog', 'RJ_RedJohn_TheMentalist'];
+        //$text = preg_replace_callback('/:([a-zA-Z0-9_]+):/', function($m) use ($inline, $domain) {return in_array($m[1], $inline, true)? "<img src=\"https://$domain/z_files/emojis/{$m[1]}.gif\">": $m[0];}, $text);
+
 
         $inReplyTo = null;
         $mentionTag = null;
@@ -162,11 +170,18 @@ foreach ($data as $entry) {
 
         // Format quotes and links
         $quotedText = formatQuotes($text);
-        $htmlText = preg_replace(
-            '~(https?://[^\s<]+)~i',
-            '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>',
-            $quotedText
-        );
+$htmlText = preg_replace_callback(
+    '~(https?://[^\s<]+)~i',
+    function ($match) {
+        $url = $match[0]; // Use the full matched URL
+        if (str_contains($url, '/z_files/emojis/')) {
+            return $url; // Don�t linkify emoji image URLs
+        }
+        return '<a href="' . htmlspecialchars($url) . '" target="_blank" rel="nofollow noopener noreferrer">' . htmlspecialchars($url) . '</a>';
+    },
+    $quotedText
+);
+
 
         // Convert hashtags to tag links
         $htmlText = preg_replace_callback('/#([\w-]+)/', function($matches) use ($domain) {
@@ -175,6 +190,7 @@ foreach ($data as $entry) {
             return "<a href=\"$url\" rel=\"tag nofollow noopener noreferrer\">#" . htmlspecialchars($tag) . "</a>";
         }, $htmlText);
 
+        
         $htmlText = nl2br($htmlText);
 
         // Build hashtag tag objects
@@ -273,27 +289,74 @@ $uri = explode('?', $_SERVER['REQUEST_URI'] ?? '')[0];
 if ($uri === "/$username" || $uri === "/$username/") {
     header('Content-Type: application/activity+json');
     header('Vary: Accept');
-    $descHtml = formatDescriptionLinks("This is **Alcea's** semiâ€‘automated profile! It fetches from a local timeline at https://alceawis.com");
+
+    $profileData = [];
+    $profileInfoFile = __DIR__ . '/profileinfo.json';
+
+    if (file_exists($profileInfoFile)) {
+        $profileData = json_decode(file_get_contents($profileInfoFile), true) ?? [];
+    }
+
+    $description = $profileData['description'] ?? 'This is Alcea\'s default profile description.';
+    $imageUrl = $profileData['image_url'] ?? "$baseUrl/z_files/emojis/alceawis.gif";
+    $links = $profileData['links'] ?? [];
+
+    // Format description
+    $descHtml = formatDescriptionLinks($description);
+
+    // Build fields[] from links[]
+    $fields = [];
+    foreach ($links as $link) {
+        $name = trim($link['name'] ?? '');
+        $url = trim($link['url'] ?? '');
+        if ($name !== '' && $url !== '') {
+            $safeUrl = htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $fields[] = [
+                'name' => $name,
+                'value' => "<a href=\"$safeUrl\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">$safeUrl</a>",
+            ];
+        }
+    }
+
     echo json_encode([
-        '@context'          => ['https://www.w3.org/ns/activitystreams',['manuallyApprovesFollowers'=>'as:manuallyApprovesFollowers','toot'=>'http://joinmastodon.org/ns#','featured'=>['@id'=>'toot:featured','@type'=>'@id']]],
-        'id'                => "$baseUrl/$username",
-        'type'              => 'Person',
-        'name'              => 'Alcea Bot',
+        '@context' => [
+            'https://www.w3.org/ns/activitystreams',
+            [
+                'manuallyApprovesFollowers' => 'as:manuallyApprovesFollowers',
+                'toot' => 'http://joinmastodon.org/ns#',
+                'featured' => ['@id' => 'toot:featured', '@type' => '@id'],
+            ]
+        ],
+        'id' => "$baseUrl/$username",
+        'type' => 'Person',
+        'name' => 'Alcea Bot',
         'preferredUsername' => $username,
-        'summary'           => $descHtml,
-        'icon'              => ['type'=>'Image','mediaType'=>'image/gif','url'=>"$baseUrl/z_files/emojis/alceawis.gif"],
-        'inbox'             => "$baseUrl/$username/inbox",
-        'outbox'            => "$baseUrl/$username/outbox",
-        'followers'         => "$baseUrl/$username/followers",
-        'publicKey'         => ['id'=>"$baseUrl/$username#main-key",'owner'=>"$baseUrl/$username",'publicKeyPem'=>file_get_contents(__DIR__ . '/public.pem')],
-        'locked'        => false,
-        'bot'           => false,
-        'discoverable'  => true,
-        'group'         => false,
-        'manuallyApprovesFollowers'         => false,
+        'summary' => $descHtml,
+        'icon' => [
+            'type' => 'Image',
+            'mediaType' => 'image/gif',
+            'url' => $imageUrl,
+        ],
+        'inbox' => "$baseUrl/$username/inbox",
+        'outbox' => "$baseUrl/$username/outbox",
+        'followers' => "$baseUrl/$username/followers",
+        'publicKey' => [
+            'id' => "$baseUrl/$username#main-key",
+            'owner' => "$baseUrl/$username",
+            'publicKeyPem' => file_get_contents(__DIR__ . '/public.pem'),
+        ],
+        'locked' => false,
+        'bot' => false,
+        'discoverable' => true,
+        'group' => false,
+        'manuallyApprovesFollowers' => false,
+        'fields' => $fields,
+        'updated' => date(DATE_ATOM),  // Optional but helpful
     ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+
     exit;
 }
+
 
 if ($uri === "/$username/outbox" || $uri === "/$username/outbox/") {
     header('Content-Type: application/activity+json');
