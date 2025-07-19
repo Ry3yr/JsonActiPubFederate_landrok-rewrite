@@ -192,12 +192,11 @@ while ((match = quoteRegex.exec(value)) !== null) {
     quoteBlock.style.backgroundColor = '#f9f9f9';
     const formattedQuote = match[1].replace(/\n/g, '<br>');
     quoteBlock.innerHTML = formattedQuote.trim();
-        postElement.appendChild(quoteBlock);
+    postElement.appendChild(quoteBlock);
 }
 
 
 //link2acws
-// Function to decode surrogate pairs and Unicode escapes from JSON string literal
 function decodeUnicodeEscapes(str) {
     return str.replace(/\\u([\dA-Fa-f]{4})/g, (_, hex) =>
         String.fromCharCode(parseInt(hex, 16))
@@ -209,18 +208,27 @@ if (value.includes("•acws")) {
     const decodedValue = decodeUnicodeEscapes(value);
     const formattedValue = decodedValue.replace(/𒐫(.*?)𒐫/g, '<blockquote>$1</blockquote>');
 
-    const dateClean = date.replace(/-/g, '');
-    const hash = CryptoJS.MD5(formattedValue).toString().substring(0, 8);
-    const permalink = `https://alceawis.com/alceawis/status/${dateClean}-${hash}`;
-
-    // Step 4: create and append link
     const link = document.createElement('a');
-    link.href = permalink;
     link.target = "_blank";
-    link.textContent = 'Permalink';
     link.classList.add('btn2');
+
+    if (typeof CryptoJS !== "undefined" && CryptoJS.MD5) {
+        const dateClean = date.replace(/-/g, '');
+        const hash = CryptoJS.MD5(formattedValue).toString().substring(0, 8);
+        const permalink = `https://alceawis.com/alceawis/status/${dateClean}-${hash}`;
+        
+        link.href = permalink;
+        link.textContent = 'Permalink';
+    } else {
+        link.href = "#";
+        link.textContent = 'no CryptoJS';
+    }
+
     postElement.appendChild(link);
 }
+
+
+
 
 
 
