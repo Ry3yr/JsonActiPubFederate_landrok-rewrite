@@ -1,20 +1,5 @@
-<?php
-//redirect v1/statuses/id calls to status
-$request_uri = $_SERVER['REQUEST_URI'];
-if (preg_match('#^/api/v1/statuses/([^/]+)#', $request_uri, $matches)) {
-    $status_id = $matches[1];
-    header("Location: https://alceawis.com/alceawis/status/$status_id?redirected");
-    exit();
-}?>
-<?php
-// Replace "_" with "#" for post resolution
-$requestUri = $_SERVER['REQUEST_URI'] ?? '';
-if (strpos($requestUri, '/_https://') === 0) {
-    $newUri = str_replace('/_https://', '/#https://', $requestUri);
-    echo '<script>window.location.href = "' . htmlspecialchars($newUri) . '";</script>';
-    exit;
-}
-?>
+
+
 <?php
 //load timeline if root url
 $currentDomain = $_SERVER['HTTP_HOST'];
@@ -337,46 +322,53 @@ if (preg_match('/^\/' . $username . '\/status\/([a-z0-9\-]+)$/', $uri, $m)) {
     $post   = null; $date = ''; $hash = '';
     foreach ($data as $entry)
         foreach ($entry as $d => $c)
-            if ("$d-" . substr(md5($c['value']),0,8) === $postId) { $post=$c; $date=$d; $hash=substr(md5($c['value']),0,8); break 2; }
-    if (!$post) { http_response_code(404); echo "Not found"; exit; }
+            if ("$d-" . substr(md5($c['value']),0,8) === $postId) {
+                $post = $c; $date = $d; $hash = substr(md5($c['value']),0,8); break 2;
+            }
+    if (!$post) {
+        http_response_code(404);
+        echo "Not found";
+        exit;
+    }
 
-    $text  = formatEmojis($post['value']);
-    $html  = nl2br(preg_replace('~(https?://[^\s<]+)~i','<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>',formatQuotes(htmlspecialchars($text))));
-    $note  = [
-        '@context'      => 'https://www.w3.org/ns/activitystreams',
-        'id'            => "$baseUrl/$username/status/{$date}-$hash",
-        'url'           => "$baseUrl/$username/status/{$date}-$hash",
-        'type'          => 'Note',
-        'published'     => date(DATE_ATOM, strtotime($date)),
-        'attributedTo'  => "$baseUrl/$username",
-        'to'            => ['https://www.w3.org/ns/activitystreams#Public'],
-        'content'       => $html,
-        'contentMap'    => ['und'=>$post['value'],'html'=>$html],
- 'tag' => array_merge(
-    array_map(fn($t) => [
-        'type' => 'Hashtag',
-        'name' => "#$t",
-        'href' => "https://$domain/tags/$t"
-    ], array_filter(array_map('trim', explode(',', $post['hashtags'] ?? '')))),
-    (function() use ($post, $domain) {
-        preg_match_all('/:([a-zA-Z0-9_]+):/', $post['value'], $matches);
-        return array_map(fn($sc) => [
-            'type' => 'Emoji',
-            'name' => ":$sc:",
-            'icon' => [
-                'type' => 'Image',
-                'mediaType' => 'image/gif',
-                'url' => "https://$domain/z_files/emojis/$sc.gif"
-            ]
-        ], $matches[1]);
-    })()
-)
+    $noteId = "$baseUrl/$username/status/{$date}-$hash";
 
-    ];
-    header('Content-Type: application/activity+json');
-    echo json_encode($note, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    // Determine if client accepts JSON
+    $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+    if (str_contains($accept, 'application/activity+json') || str_contains($accept, 'application/ld+json')) {
+        header('Content-Type: application/activity+json');
+        echo json_encode([
+            '@context'     => 'https://www.w3.org/ns/activitystreams',
+            'id'           => $noteId,
+            'type'         => 'Note',
+            'published'    => date(DATE_ATOM, strtotime($date)),
+            'attributedTo' => "$baseUrl/$username",
+            'to'           => ['https://www.w3.org/ns/activitystreams#Public'],
+            'content'      => $post['value'],
+            'contentMap'   => ['und' => $post['value']],
+        ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    // Otherwise, return an HTML redirect after 1 second
+    header('Content-Type: text/html');
+    $redirectUrl = "https://alceawis.com#" . $noteId;
+    echo <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Redirecting…</title>
+    <meta http-equiv="refresh" content="1; url=$redirectUrl">
+</head>
+<body>
+    <p>Redirecting to <a href="$redirectUrl">$redirectUrl</a>…</p>
+</body>
+</html>
+HTML;
     exit;
 }
+
 
 if ($uri === "/$username/followers" || $uri === "/$username/followers/") {
     header('Content-Type: application/activity+json');

@@ -8,14 +8,22 @@ RewriteEngine On
 </IfModule>
 
 
+# Redirect Pulsetic
+RewriteCond %{HTTP_USER_AGENT} ^Pulsetic [NC]
+RewriteRule ^.*$ /timeline.html [R=302,L]
+# Redirect UptimeRobot
+RewriteCond %{HTTP_USER_AGENT} ^UptimeRobot [NC]
+RewriteRule ^.*$ /timeline.html [R=302,L]
+
+
 #user/status/ -to just- /status
 #RewriteCond %{HTTP_REFERER} !^https?://(www\.)?alceawis\.com/ [NC]
 #RewriteRule ^alceawis/([0-9]{8}-[a-f0-9]+)$ /alceawis/status/$1 [R=301,L]
 
-# Match /alceawis/status/* URLs (if you disable sexond line, remote resolve will be impossible)
-RewriteCond %{REQUEST_URI} ^/alceawis/status/.+$
-RewriteCond %{HTTP_REFERER} ^https?://(www\.)?alceawis\.com [NC]
-RewriteRule ^alceawis/status/(.+)$ /_https://alceawis.com/alceawis/status/$1 [R=301,L]
+# Match /alceawis/status/* URLs (if you disable second line, remote resolve will be impossible)
+#RewriteCond %{REQUEST_URI} ^/alceawis/status/.+$
+#RewriteCond %{HTTP_REFERER} ^https?://(www\.)?alceawis\.com [NC]
+#RewriteRule ^alceawis/status/(.+)$ /_https://alceawis.com/alceawis/status/$1 [R=301,L]
 
 # Redirect /users/username to /username dynamically
 RewriteRule ^users/([^/]+)/?$ /$1 [R=301,L]
