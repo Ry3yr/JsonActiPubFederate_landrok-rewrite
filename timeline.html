@@ -1,34 +1,32 @@
+<meta charset="utf-8">
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 $(document).ready(function () {
-  const domain = window.location.hostname;
-  const federatedHandle = `${domain.split('.')[0]}@${domain}`;
-  const searchURL = `https://mastodon.social/search?q=${encodeURIComponent(federatedHandle)}&type=accounts`;
-  const checkLinkExistence = setInterval(function () {
-    const existingLink = $('a[href^="https://mastodon.social/search"]');
-    if (existingLink.length > 0) {
-      clearInterval(checkLinkExistence);
-    } else {
-      const container = $('<div>').addClass('formClass');
-      const paragraph = $('<p>').text("You can follow this profile on Fediverse by typing the handle in your instance search or clicking this link:");
-      const link = $('<a>').attr('href', searchURL).attr('target', '_blank').text(federatedHandle);
-      container.append(paragraph, link);
-      $('body').prepend(container);
-      clearInterval(checkLinkExistence);
-    }
-  }, 1500);
+  const federatedHandle = "alceawis@alceawis.com";
+  const searchURL = `https://mas.to/search?q=${encodeURIComponent(federatedHandle)}&type=accounts`;
+  const container = $('<div>').addClass('formClass');
+  const paragraph = $('<p>').text("You can follow this profile on Fediverse by typing the handle in your instance search or clicking this link:");
+  container.append(paragraph);
+  const link = $('<a>')
+    .attr('href', searchURL)
+    .attr('target', '_blank')
+    .text(federatedHandle);
+  container.append(link);
+  $('body').prepend(container);
 });
-</script><a target="_blank" href="https://mas.to/search?q=alceawis%40alceawis.com&type=accounts" style=color:pink>2</a><br>
+</script>
+
+<a target="_blank" href="https://mas.to/search?q=alceawis%40alceawis.com&type=accounts" style=color:pink>2</a><br>
 (Or use this <a target="_blank" href="https://mastodon.social/@alcea/114834785762248316" style=color:gray>post</a> as reference to find the profile. You can search for this url too!) <a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=4000&text=Where%20%40alceawis%40alceawis." id=3936 style=color:green>Instance Compatibility</a><hr>
 <!-----Debug---->
 <details><summary>Debug</summary>
 <a target="_blank" href="debug.log" style=color:blue>debug.log</a><br>
 <a target="_blank" href="inbox.log" style=color:blue>inbox.log</a><br>
 <a target="_blank" href="https://alceawis.com/emojifetch.php" style=color:blue>Emoji Downloader</a><br>
-•<a href="https://alceawis.com/api/v1/custom_emojis" target="_blank" rel="noopener noreferrer">Emoji Endpoint</a><br>
-•<a href="https://alceawis.com/api/v1/statuses/20250713-f441340a" target="_blank" rel="noopener noreferrer">v1 Statuses API</a><br>
-•<a href="https://alceawis.com/alceawis/followers" target="_blank" rel="noopener noreferrer">Followers</a><br>
-•<a href="https://alceawis.com/alceawis/outbox?page=true" target="_blank" rel="noopener noreferrer">User Timeline (Outbox, paged)</a><br>
+*<a href="https://alceawis.com/api/v1/custom_emojis" target="_blank" rel="noopener noreferrer">Emoji Endpoint</a><br>
+*<a href="https://alceawis.com/api/v1/statuses/20250713-f441340a" target="_blank" rel="noopener noreferrer">v1 Statuses API</a><br>
+*<a href="https://alceawis.com/alceawis/followers" target="_blank" rel="noopener noreferrer">Followers</a><br>
+*<a href="https://alceawis.com/alceawis/outbox?page=true" target="_blank" rel="noopener noreferrer">User Timeline (Outbox, paged)</a><br>
 <hr>
   <div id="debug-info"></div>
 </details>
@@ -60,8 +58,9 @@ $(document).ready(function () {
         <!--<a target="_blank" href="#" style="display: block; margin: 5px; color: #D5006D; text-decoration: none;">-</a>-->
         <hr>
                <a target="_blank" href="https://app.pulsetic.com/status/bVlNm1Cj/?preview=true#https://stats.uptimerobot.com/6wi9pgxFJ5" style=color:#D5006D>Status</a><br>
-                <a target="_blank" href="https://fba.ryona.agency/?domain=alceawis.com" style=color:#D5006D>BLCK</a><br>
+                <a target="_blank" href="https://fba.ryona.agency/?domain=alceawis.com" style=color:#D5006D>BLCK</a>(<a target="_blank" href="https://alcea-wisteria.de/PHP/0demo/2023-08-15-JSFiddle-Clone/htmls/2025-07-20-Fediverse-AmISuspended-Checker.html#https://codepen.io/ryedai1/full/wBKMxBJ" style=color:orange>Suspended ?</a>)<br>
                <a target="_blank" href="https://mastodon.social/@alcea" style="display: block; margin: 5px; color: #D5006D; text-decoration: none;">@alcea@mastodon.social</a>
+               <a target="_blank" href="https://alcea-wisteria.de/PHP/0demo/2024-03-07-FediTools/2025-07-12-Post-JSON-Fetch/fetch.php" style=color:#D5006D>JSON Post Test</a>
     </div>
 </div>
 
@@ -346,7 +345,7 @@ $(document).ready(function () {
       <div class="content">${content}</div>
     <a href="${post.id}" target="_blank">[link]</a>
 <button class="reply-btn" data-post-id="${post.id}" style="padding:5px 10px; cursor:pointer;background: rgba(255, 105, 180, 0.7); border: none;border-radius: 12px;color: white;font-weight: bold;transition: background 0.3s ease;"> Reply</button>
-<button class="json-btn" data-json-url="${post.id}" style="padding:5px 10px; cursor:pointer;background: rgba(255, 105, 180, 0.7); border: none;border-radius: 12px;color: white;font-weight: bold;transition: background 0.3s ease;">  Show JSON</button>
+<button class="json-btn" data-json-url="${post.id}" style="padding:5px 10px; cursor:pointer;background: rgba(255, 105, 180, 0.4); border: none;border-radius: 12px;color: white;font-weight: bold;transition: background 0.3s ease;">  Show JSON</button>
 
 
 
@@ -520,11 +519,11 @@ $(document).ready(function () {
 
 
 <!-- Single shared reply modal -->
-<div id="replyModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:1000"
-     onclick="if(event.target===this)this.style.display='none'">
-  <div style="background:#fff;padding:1em;border-radius:5px">
-    <input placeholder='@user@domain' id="modalInput" style="margin-right:10px"/>
-    <button id="submitReplyBtn">Submit</button>
+<div id="replyModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:1000;overflow:auto" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:#fff;padding:1em;border-radius:8px;max-width:400px;width:100%">
+    <p>Reply or interact with post <br> enter @user@domain or homedomain):</p>
+    <input type="text" id="modalInput" placeholder="@user@domain" style="width:calc(100% - 120px);padding:0.5em;margin-right:10px" aria-label="Enter username and domain"/>
+    <button id="submitReplyBtn" style="padding:0.5em 1em;background-color:#007BFF;color:white;border:none;border-radius:5px;cursor:pointer" onclick="submitReply()">Submit</button>
   </div>
 </div>
 <script>
