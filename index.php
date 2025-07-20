@@ -117,22 +117,12 @@ function sendCreateActivity(array $note) {
 }
 
 /* ---------- build outbox ---------- */
-
-
 $lastNoteId = null;
 
 foreach ($data as $entry) {
     foreach ($entry as $date => $content) {
         $hash = substr(md5($content['value']), 0, 8);
-        $normalizedContent = preg_replace('/:([a-zA-Z0-9_]+):\r?\n/', ':$1: ', $content['value']); // Normalize newlines after emoji shortcodes
-        $text = formatEmojis($normalizedContent);
-       // preg_match_all('/:([a-zA-Z0-9_]+):/', $text, $matches);
-        //$emojisFound = implode(", ", $matches[1]);
-        //error_log("Emojis found: $emojisFound\n", 3, __DIR__ . '/debug.log');
-
-        //$inline = ['rofl', 'confused_dog', 'RJ_RedJohn_TheMentalist'];
-        //$text = preg_replace_callback('/:([a-zA-Z0-9_]+):/', function($m) use ($inline, $domain) {return in_array($m[1], $inline, true)? "<img src=\"https://$domain/z_files/emojis/{$m[1]}.gif\">": $m[0];}, $text);
-
+        $text = formatEmojis($content['value']);
 
         $inReplyTo = null;
         $mentionTag = null;
@@ -170,18 +160,11 @@ foreach ($data as $entry) {
 
         // Format quotes and links
         $quotedText = formatQuotes($text);
-$htmlText = preg_replace_callback(
-    '~(https?://[^\s<]+)~i',
-    function ($match) {
-        $url = $match[0]; // Use the full matched URL
-        if (str_contains($url, '/z_files/emojis/')) {
-            return $url; // Don�t linkify emoji image URLs
-        }
-        return '<a href="' . htmlspecialchars($url) . '" target="_blank" rel="nofollow noopener noreferrer">' . htmlspecialchars($url) . '</a>';
-    },
-    $quotedText
-);
-
+        $htmlText = preg_replace(
+            '~(https?://[^\s<]+)~i',
+            '<a href="$1" target="_blank" rel="nofollow noopener noreferrer">$1</a>',
+            $quotedText
+        );
 
         // Convert hashtags to tag links
         $htmlText = preg_replace_callback('/#([\w-]+)/', function($matches) use ($domain) {
@@ -190,7 +173,6 @@ $htmlText = preg_replace_callback(
             return "<a href=\"$url\" rel=\"tag nofollow noopener noreferrer\">#" . htmlspecialchars($tag) . "</a>";
         }, $htmlText);
 
-        
         $htmlText = nl2br($htmlText);
 
         // Build hashtag tag objects
@@ -254,8 +236,6 @@ $htmlText = preg_replace_callback(
         }
     }
 }
-
-// Log last pushed note
 if (!empty($pushed)) {
     $lastPushedUrl = end($pushed);
 
@@ -289,74 +269,27 @@ $uri = explode('?', $_SERVER['REQUEST_URI'] ?? '')[0];
 if ($uri === "/$username" || $uri === "/$username/") {
     header('Content-Type: application/activity+json');
     header('Vary: Accept');
-
-    $profileData = [];
-    $profileInfoFile = __DIR__ . '/profileinfo.json';
-
-    if (file_exists($profileInfoFile)) {
-        $profileData = json_decode(file_get_contents($profileInfoFile), true) ?? [];
-    }
-
-    $description = $profileData['description'] ?? 'This is Alcea\'s default profile description.';
-    $imageUrl = $profileData['image_url'] ?? "$baseUrl/z_files/emojis/alceawis.gif";
-    $links = $profileData['links'] ?? [];
-
-    // Format description
-    $descHtml = formatDescriptionLinks($description);
-
-    // Build fields[] from links[]
-    $fields = [];
-    foreach ($links as $link) {
-        $name = trim($link['name'] ?? '');
-        $url = trim($link['url'] ?? '');
-        if ($name !== '' && $url !== '') {
-            $safeUrl = htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            $fields[] = [
-                'name' => $name,
-                'value' => "<a href=\"$safeUrl\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">$safeUrl</a>",
-            ];
-        }
-    }
-
+    $descHtml = formatDescriptionLinks("This is **Alcea's** semiâ€‘automated profile! It fetches from a local timeline at https://alceawis.com");
     echo json_encode([
-        '@context' => [
-            'https://www.w3.org/ns/activitystreams',
-            [
-                'manuallyApprovesFollowers' => 'as:manuallyApprovesFollowers',
-                'toot' => 'http://joinmastodon.org/ns#',
-                'featured' => ['@id' => 'toot:featured', '@type' => '@id'],
-            ]
-        ],
-        'id' => "$baseUrl/$username",
-        'type' => 'Person',
-        'name' => 'Alcea Bot',
+        '@context'          => ['https://www.w3.org/ns/activitystreams',['manuallyApprovesFollowers'=>'as:manuallyApprovesFollowers','toot'=>'http://joinmastodon.org/ns#','featured'=>['@id'=>'toot:featured','@type'=>'@id']]],
+        'id'                => "$baseUrl/$username",
+        'type'              => 'Person',
+        'name'              => 'Alcea Bot',
         'preferredUsername' => $username,
-        'summary' => $descHtml,
-        'icon' => [
-            'type' => 'Image',
-            'mediaType' => 'image/gif',
-            'url' => $imageUrl,
-        ],
-        'inbox' => "$baseUrl/$username/inbox",
-        'outbox' => "$baseUrl/$username/outbox",
-        'followers' => "$baseUrl/$username/followers",
-        'publicKey' => [
-            'id' => "$baseUrl/$username#main-key",
-            'owner' => "$baseUrl/$username",
-            'publicKeyPem' => file_get_contents(__DIR__ . '/public.pem'),
-        ],
-        'locked' => false,
-        'bot' => false,
-        'discoverable' => true,
-        'group' => false,
-        'manuallyApprovesFollowers' => false,
-        'fields' => $fields,
-        'updated' => date(DATE_ATOM),  // Optional but helpful
+        'summary'           => $descHtml,
+        'icon'              => ['type'=>'Image','mediaType'=>'image/gif','url'=>"$baseUrl/z_files/emojis/alceawis.gif"],
+        'inbox'             => "$baseUrl/$username/inbox",
+        'outbox'            => "$baseUrl/$username/outbox",
+        'followers'         => "$baseUrl/$username/followers",
+        'publicKey'         => ['id'=>"$baseUrl/$username#main-key",'owner'=>"$baseUrl/$username",'publicKeyPem'=>file_get_contents(__DIR__ . '/public.pem')],
+        'locked'        => false,
+        'bot'           => false,
+        'discoverable'  => true,
+        'group'         => false,
+        'manuallyApprovesFollowers'         => false,
     ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
-
     exit;
 }
-
 
 if ($uri === "/$username/outbox" || $uri === "/$username/outbox/") {
     header('Content-Type: application/activity+json');
@@ -385,8 +318,8 @@ if (preg_match('/^\/' . $username . '\/status\/([a-z0-9\-]+)$/', $uri, $m)) {
     $post   = null; $date = ''; $hash = '';
     foreach ($data as $entry)
         foreach ($entry as $d => $c)
-            if ("$d-" . substr(md5($c['value']),0,8) === $postId) {
-                $post = $c; $date = $d; $hash = substr(md5($c['value']),0,8); break 2;
+            if ("$d-" . substr(md5($c['value']), 0, 8) === $postId) {
+                $post = $c; $date = $d; $hash = substr(md5($c['value']), 0, 8); break 2;
             }
     if (!$post) {
         http_response_code(404);
@@ -394,21 +327,76 @@ if (preg_match('/^\/' . $username . '\/status\/([a-z0-9\-]+)$/', $uri, $m)) {
         exit;
     }
 
+    // Construct noteId
     $noteId = "$baseUrl/$username/status/{$date}-$hash";
+
+    // Extract content
+    $content = $post['value'];
+
+    // Prepare tags (hashtags, mentions, emoji tags)
+    $tags = [];
+    $emojiTags = [];
+    $hashtags = [];
+    $mentions = [];
+
+    // Extract hashtags: #hashtag
+    preg_match_all('/#(\w+)/', $content, $hashtags);
+    foreach ($hashtags[1] as $hashtag) {
+        $tags[] = [
+            "type" => "Hashtag",
+            "name" => "#$hashtag",
+            "href" => "$baseUrl/tags/$hashtag"
+        ];
+    }
+
+    // Extract mentions: @username
+    preg_match_all('/@(\w+)/', $content, $mentions);
+    foreach ($mentions[1] as $mention) {
+        // Not directly used in tags, but can be added if needed
+    }
+
+    // Extract emoji tags: :emoji:
+    preg_match_all('/:([\w\+\-]+):/', $content, $emojiTags);
+    foreach ($emojiTags[1] as $emoji) {
+        // Assuming emoji images are stored on a path like "/z_files/emojis/{emoji}.gif"
+        $tags[] = [
+            "type" => "Emoji",
+            "name" => ":$emoji:",
+            "icon" => [
+                "type" => "Image",
+                "mediaType" => "image/gif",
+                "url" => "$baseUrl/z_files/emojis/$emoji.gif"
+            ]
+        ];
+    }
 
     // Determine if client accepts JSON
     $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
     if (str_contains($accept, 'application/activity+json') || str_contains($accept, 'application/ld+json')) {
         header('Content-Type: application/activity+json');
         echo json_encode([
-            '@context'     => 'https://www.w3.org/ns/activitystreams',
+            '@context'     => [
+                'https://www.w3.org/ns/activitystreams',
+                [
+                    'manuallyApprovesFollowers' => 'as:manuallyApprovesFollowers',
+                    'toot' => 'http://joinmastodon.org/ns#',
+                    'featured' => [
+                        '@id' => 'toot:featured',
+                        '@type' => '@id'
+                    ]
+                ]
+            ],
             'id'           => $noteId,
             'type'         => 'Note',
             'published'    => date(DATE_ATOM, strtotime($date)),
             'attributedTo' => "$baseUrl/$username",
             'to'           => ['https://www.w3.org/ns/activitystreams#Public'],
-            'content'      => $post['value'],
-            'contentMap'   => ['und' => $post['value']],
+            'content'      => $content,
+            'contentMap'   => [
+                'und' => $content,
+                'html' => nl2br($content) // Convert newlines to <br> for HTML
+            ],
+            'tag'          => $tags,
         ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
         exit;
     }
