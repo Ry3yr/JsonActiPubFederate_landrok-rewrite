@@ -269,25 +269,60 @@ $uri = explode('?', $_SERVER['REQUEST_URI'] ?? '')[0];
 if ($uri === "/$username" || $uri === "/$username/") {
     header('Content-Type: application/activity+json');
     header('Vary: Accept');
-    $descHtml = formatDescriptionLinks("This is **Alcea's** semiâ€‘automated profile! It fetches from a local timeline at https://alceawis.com");
-    echo json_encode([
-        '@context'          => ['https://www.w3.org/ns/activitystreams',['manuallyApprovesFollowers'=>'as:manuallyApprovesFollowers','toot'=>'http://joinmastodon.org/ns#','featured'=>['@id'=>'toot:featured','@type'=>'@id']]],
-        'id'                => "$baseUrl/$username",
-        'type'              => 'Person',
-        'name'              => 'Alcea Bot',
-        'preferredUsername' => $username,
-        'summary'           => $descHtml,
-        'icon'              => ['type'=>'Image','mediaType'=>'image/gif','url'=>"$baseUrl/z_files/emojis/alceawis.gif"],
-        'inbox'             => "$baseUrl/$username/inbox",
-        'outbox'            => "$baseUrl/$username/outbox",
-        'followers'         => "$baseUrl/$username/followers",
-        'publicKey'         => ['id'=>"$baseUrl/$username#main-key",'owner'=>"$baseUrl/$username",'publicKeyPem'=>file_get_contents(__DIR__ . '/public.pem')],
-        'locked'        => false,
-        'bot'           => false,
-        'discoverable'  => true,
-        'group'         => false,
-        'manuallyApprovesFollowers'         => false,
-    ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    $profileFile = __DIR__ . '/profileinfo.json';
+$profileData = file_exists($profileFile) ? json_decode(file_get_contents($profileFile), true) : [];
+
+$imageUrl   = $profileData['image_url'] ?? "$baseUrl/z_files/emojis/alceawis.gif";
+$descHtml   = formatDescriptionLinks($profileData['description'] ?? '');
+$summaryRaw = $profileData['description'] ?? '';
+
+$fields = [];
+foreach ($profileData['links'] ?? [] as $link) {
+    if (!empty($link['name']) && !empty($link['url'])) {
+        $fields[] = [
+            'name' => $link['name'],
+            'value' => '<a href="' . htmlspecialchars($link['url']) . '" rel="me nofollow noopener noreferrer" target="_blank">' . htmlspecialchars($link['url']) . '</a>'
+        ];
+    }
+}
+
+echo json_encode([
+    '@context' => [
+        'https://www.w3.org/ns/activitystreams',
+        [
+            'manuallyApprovesFollowers' => 'as:manuallyApprovesFollowers',
+            'toot' => 'http://joinmastodon.org/ns#',
+            'featured' => [
+                '@id' => 'toot:featured',
+                '@type' => '@id'
+            ]
+        ]
+    ],
+    'id' => "$baseUrl/$username",
+    'type' => 'Person',
+    'name' => 'Alcea Bot',
+    'preferredUsername' => $username,
+    'summary' => $descHtml,
+    'icon' => [
+        'type' => 'Image',
+        'mediaType' => 'image/gif',
+        'url' => $imageUrl
+    ],
+    'inbox' => "$baseUrl/$username/inbox",
+    'outbox' => "$baseUrl/$username/outbox",
+    'followers' => "$baseUrl/$username/followers",
+    'publicKey' => [
+        'id' => "$baseUrl/$username#main-key",
+        'owner' => "$baseUrl/$username",
+        'publicKeyPem' => file_get_contents(__DIR__ . '/public.pem')
+    ],
+    'manuallyApprovesFollowers' => false,
+    'bot' => false,
+    'discoverable' => true,
+    'indexable' => true,
+    'group' => false,
+    'attachment' => $fields
+], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     exit;
 }
 
