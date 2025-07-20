@@ -1,5 +1,7 @@
 # JsonActiPubFederate (landrok rewrite)
 
+Targeting PHP version: 8.3.6. 
+
 --Required: --  
 •  dependencies: "sudo apt install php php-cli php-curl php-mbstring php-xml php-json php-zip php-openssl"  
 • Domain with SSL (A set to your target server and server configured vice versa) - LetsEncrypt works  
