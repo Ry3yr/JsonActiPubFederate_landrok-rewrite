@@ -141,6 +141,7 @@ function sendCreateActivity(array $object) {
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id'           => "$baseUrl/$username",
         'discoverable'  => true,  // Update the discoverable field
+        'indexable'  => true,
         'locked'        => false,
         'bot'           => false,
         'id' => $object['id'] . '/activity',
@@ -230,6 +231,7 @@ function updateProfile() {
         ],
         'fields' => $fields,
         'discoverability' => 'public', // <-- Here is the key for discoverability
+        'indexable' => 'true',
     ];
 
     $followers = [];
